@@ -34,3 +34,12 @@ target/
 lib_managed/
 src_managed/
 boot/
+
+# K framework
+#####
+*-kompiled
+
+# OS X
+#####
+.DS_Store
+
