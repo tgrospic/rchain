@@ -139,6 +139,8 @@ object Runtime {
     val GET_BLOCK_DATA: Long               = 23L
     val GET_INVALID_BLOCKS: Long           = 24L
     val REV_ADDRESS: Long                  = 25L
+    // My special names
+    val HTTP: Long = 25L
   }
 
   def byteName(b: Byte): Par = GPrivate(ByteString.copyFrom(Array[Byte](b)))
@@ -160,6 +162,8 @@ object Runtime {
     val GET_BLOCK_DATA: Par     = byteName(13)
     val GET_INVALID_BLOCKS: Par = byteName(14)
     val REV_ADDRESS: Par        = byteName(15)
+    // My special names
+    val HTTP: Par = byteName(15)
   }
 
   private def introduceSystemProcesses[F[_]: Sync: _cost](
@@ -220,6 +224,11 @@ object Runtime {
   }
 
   def stdSystemProcesses[F[_]]: Seq[SystemProcess.Definition[F]] = Seq(
+    // HTTP process
+    SystemProcess.Definition[F]("rho:io:http", FixedChannels.HTTP, 2, BodyRefs.HTTP, {
+      ctx: SystemProcess.Context[F] =>
+        ctx.systemProcesses.http
+    }),
     SystemProcess.Definition[F]("rho:io:stdout", FixedChannels.STDOUT, 1, BodyRefs.STDOUT, {
       ctx: SystemProcess.Context[F] =>
         ctx.systemProcesses.stdOut

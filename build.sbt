@@ -390,7 +390,7 @@ lazy val rholang = (project in file("rholang"))
       catsLawsTest,
       catsLawsTestkitTest,
       catsMtlLawsTest
-    ),
+    ) ++ Seq("org.scalaj" %% "scalaj-http" % "2.4.1"),
     mainClass in assembly := Some("coop.rchain.rho2rose.Rholang2RosetteCompiler"),
     coverageExcludedFiles := Seq(
       (javaSource in Compile).value,
