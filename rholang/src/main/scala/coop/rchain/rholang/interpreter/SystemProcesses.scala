@@ -14,6 +14,7 @@ import coop.rchain.rholang.interpreter.Runtime.{BlockDataStorage, InvalidBlocks,
 import coop.rchain.rholang.interpreter.util.RevAddress
 import coop.rchain.rspace.{ContResult, Result}
 import scalaj.http._
+import coop.rchain.casper.util.comm
 import scala.util.Try
 
 //TODO: Make each of the system processes into a case class,
@@ -36,6 +37,7 @@ trait SystemProcesses[F[_]] {
   def invalidBlocks(invalidBlocks: InvalidBlocks[F]): Contract[F]
   def validateRevAddress: Contract[F]
   def http: Contract[F]
+  def serialize: Contract[F]
 }
 
 object SystemProcesses {
@@ -116,6 +118,14 @@ object SystemProcesses {
           } catch {
             case ex: Throwable => F.delay(Console.println("Http error: " + ex.getMessage))
           }
+      }
+
+      def serialize: Contract[F] = {
+        case isContractCall(produce, Seq(term, ack)) =>
+          val serialized = prettyPrinter.buildString(term)
+          for {
+            _ <- produce(Seq(RhoType.String(serialized)), ack)
+          } yield ()
       }
 
       private def printStdOut(s: String): F[Unit] =
