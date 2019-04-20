@@ -7,14 +7,14 @@ import com.typesafe.scalalogging.Logger
 import coop.rchain.crypto.PublicKey
 import coop.rchain.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import coop.rchain.crypto.signatures.{Ed25519, Secp256k1}
-import coop.rchain.models.Expr.ExprInstance.GString
+import coop.rchain.models.Expr.ExprInstance.{EListBody, ETupleBody, GBool, GString}
 import coop.rchain.models._
 import coop.rchain.models.rholang.implicits._
 import coop.rchain.rholang.interpreter.Runtime.{BlockDataStorage, InvalidBlocks, RhoISpace}
 import coop.rchain.rholang.interpreter.util.RevAddress
-import coop.rchain.rspace.{ContResult, Result}
+import coop.rchain.rspace.{ContResult, Result, Serialize}
 import scalaj.http._
-import coop.rchain.casper.util.comm
+import scala.sys.process._
 import scala.util.Try
 
 //TODO: Make each of the system processes into a case class,
@@ -38,6 +38,7 @@ trait SystemProcesses[F[_]] {
   def validateRevAddress: Contract[F]
   def http: Contract[F]
   def serialize: Contract[F]
+  def sysProcess: Contract[F]
 }
 
 object SystemProcesses {
@@ -54,6 +55,8 @@ object SystemProcesses {
       type Channels = Seq[Result[ListParWithRandom]]
 
       private val prettyPrinter = PrettyPrinter()
+
+      private val prettyPrinterCmd = PrettyPrinterCmd()
 
       private val isContractCall = new ContractCall[F](space, dispatcher)
 
@@ -102,7 +105,7 @@ object SystemProcesses {
       def getString(par: Par) =
         par.exprs.head.exprInstance match {
           case GString(s) => s
-          case _          => throw new Error(s"Can't get String from type: $par")
+          case x          => prettyPrinter.buildString(x)
         }
 
       def http: Contract[F] = {
@@ -123,10 +126,41 @@ object SystemProcesses {
       def serialize: Contract[F] = {
         case isContractCall(produce, Seq(term, ack)) =>
           val serialized = prettyPrinter.buildString(term)
-          for {
-            _ <- produce(Seq(RhoType.String(serialized)), ack)
-          } yield ()
+          produce(Seq(RhoType.String(serialized)), ack)
       }
+
+      def sysProcess: Contract[F] = {
+        case isContractCall(produce, Seq(cmdPar, par, ack)) =>
+          val reply = (success: Boolean, p: Seq[Par]) =>
+            produce(Seq(ETupleBody(ETuple(Seq(GBool(success): Par) ++ p))), ack)
+          try {
+            val cmd     = getString(cmdPar)
+            val execCmd = buildSeqString(par.exprs.head)
+            Console.println("Run command: " + execCmd)
+            val output = execCmd.!!
+            cmd match {
+              case "run" => reply(true, Seq(GString(output)))
+              case "run:rho" => {
+                for {
+                  parRes <- ParBuilder[F].buildNormalizedTerm(output).attempt
+                  _ <- parRes.fold(
+                        ex => reply(false, Seq(GString(ex.getMessage), GString(output))),
+                        x => reply(true, Seq(x))
+                      )
+                } yield ()
+              }
+            }
+          } catch {
+            case ex: Throwable => reply(false, Seq(GString(ex.getMessage), GString("")))
+          }
+      }
+
+      def buildSeqString(e: Expr): Seq[String] =
+        e.exprInstance match {
+          case EListBody(EList(s, _, _, _)) => s.map(prettyPrinterCmd.buildString)
+          case GString(s)                   => Seq(s)
+          case _                            => Seq(prettyPrinter.buildString(e))
+        }
 
       private def printStdOut(s: String): F[Unit] =
         for {

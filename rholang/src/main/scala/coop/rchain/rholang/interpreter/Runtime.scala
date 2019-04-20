@@ -140,8 +140,9 @@ object Runtime {
     val GET_INVALID_BLOCKS: Long           = 24L
     val REV_ADDRESS: Long                  = 25L
     // My special names
-    val HTTP: Long      = 25L
-    val SERIALIZE: Long = 26L
+    val HTTP: Long        = 25L
+    val SERIALIZE: Long   = 26L
+    val SYS_PROCESS: Long = 27L
   }
 
   def byteName(b: Byte): Par = GPrivate(ByteString.copyFrom(Array[Byte](b)))
@@ -164,8 +165,9 @@ object Runtime {
     val GET_INVALID_BLOCKS: Par = byteName(14)
     val REV_ADDRESS: Par        = byteName(15)
     // My special names
-    val HTTP: Par      = byteName(15)
-    val SERIALIZE: Par = byteName(16)
+    val HTTP: Par        = byteName(15)
+    val SERIALIZE: Par   = byteName(16)
+    val SYS_PROCESS: Par = byteName(17)
   }
 
   private def introduceSystemProcesses[F[_]: Sync: _cost](
@@ -226,7 +228,7 @@ object Runtime {
   }
 
   def stdSystemProcesses[F[_]]: Seq[SystemProcess.Definition[F]] = Seq(
-    // HTTP process
+    // My processes
     SystemProcess.Definition[F]("rho:io:http", FixedChannels.HTTP, 2, BodyRefs.HTTP, {
       ctx: SystemProcess.Context[F] =>
         ctx.systemProcesses.http
@@ -235,6 +237,11 @@ object Runtime {
       .Definition[F]("rho:io:serialize", FixedChannels.SERIALIZE, 2, BodyRefs.SERIALIZE, {
         ctx: SystemProcess.Context[F] =>
           ctx.systemProcesses.serialize
+      }),
+    SystemProcess
+      .Definition[F]("rho:sys:process", FixedChannels.SYS_PROCESS, 3, BodyRefs.SYS_PROCESS, {
+        ctx: SystemProcess.Context[F] =>
+          ctx.systemProcesses.sysProcess
       }),
     SystemProcess.Definition[F]("rho:io:stdout", FixedChannels.STDOUT, 1, BodyRefs.STDOUT, {
       ctx: SystemProcess.Context[F] =>

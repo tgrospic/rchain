@@ -11,21 +11,21 @@ import coop.rchain.models._
 import scalapb.GeneratedMessage
 import coop.rchain.shared.StringOps._
 import cats.implicits._
-import coop.rchain.models.GUnforgeable.UnfInstance.{GDeployerAuthBody, GPrivateBody}
 import coop.rchain.shared.Printer
 import monix.eval.Coeval
 
-object PrettyPrinter {
-  def apply(): PrettyPrinter = PrettyPrinter(0, 0)
+object PrettyPrinterCmd {
+  def apply(): PrettyPrinterCmd = PrettyPrinterCmd(0, 0)
 
-  def apply(freeShift: Int, boundShift: Int): PrettyPrinter =
-    PrettyPrinter(freeShift, boundShift, Vector.empty[Int], "free", "a", 23, 128)
+  def apply(freeShift: Int, boundShift: Int): PrettyPrinterCmd =
+    PrettyPrinterCmd(freeShift, boundShift, Vector.empty[Int], "free", "a", 23, 128)
 
   implicit class CappedOps(val str: String) extends AnyVal {
     def cap() = Printer.OUTPUT_CAPPED.map(n => s"${str.take(n)}...").getOrElse(str)
   }
 }
-final case class PrettyPrinter(
+
+final case class PrettyPrinterCmd(
     freeShift: Int,
     boundShift: Int,
     newsShiftIndices: Vector[Int],
@@ -38,6 +38,8 @@ final case class PrettyPrinter(
 
   val indentStr = "  "
 
+  val prettyPrinter = PrettyPrinter()
+
   def boundId: String     = rotate(baseId)
   def setBaseId(): String = increment(baseId)
 
@@ -47,16 +49,6 @@ final case class PrettyPrinter(
   def buildString(e: Expr): String             = buildStringM(e).value.cap()
   def buildString(v: Var): String              = buildStringM(v).value.cap()
   def buildString(m: GeneratedMessage): String = buildStringM(m).value.cap()
-
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
-  private def buildStringM(u: GUnforgeable): Coeval[String] = Coeval.defer {
-    u.unfInstance match {
-      case GPrivateBody(p) => pure("Unforgeable(0x" + Base16.encode(p.id.toByteArray) + ")")
-      case GDeployerAuthBody(da) =>
-        pure("DeployerAuth(0x" + Base16.encode(da.publicKey.toByteArray) + ")")
-      case _ => throw new Error(s"Attempted to print unknown GUnforgeable type: $u")
-    }
-  }
 
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   private def buildStringM(e: Expr): Coeval[String] = Coeval.defer {
@@ -98,15 +90,18 @@ final case class PrettyPrinter(
         (buildStringM(target) |+| pure(" matches ") |+| buildStringM(pattern))
           .map(_.wrapWithBraces)
       case EListBody(EList(s, _, _, remainder)) =>
-        pure("[") |+| buildSeq(s) |+| buildRemainderString(remainder) |+| pure("]")
+        pure("[") |+| prettyPrinter.buildSeq(s) |+| prettyPrinter
+          .buildRemainderString(remainder) |+| pure("]")
       case ETupleBody(ETuple(s, _, _)) =>
-        pure("(") |+| buildSeq(s) |+| pure(")")
+        pure("") |+| prettyPrinter.buildSeq(s) |+| pure("")
       case ESetBody(ParSet(pars, _, _, remainder)) =>
-        pure("Set(") |+| buildSeq(pars.sortedPars) |+| buildRemainderString(remainder) |+| pure(")")
+        pure("Set(") |+| prettyPrinter.buildSeq(pars.sortedPars) |+| prettyPrinter
+          .buildRemainderString(remainder) |+| pure(")")
       case EMapBody(ParMap(ps, _, _, remainder)) =>
         pure("{") |+| (pure("") /: ps.sortedList.zipWithIndex) {
           case (string, (kv, i)) =>
-            string |+| buildStringM(kv._1) |+| pure(" : ") |+| buildStringM(kv._2) |+| pure {
+            string |+| prettyPrinter.buildStringM(kv._1) |+| pure(" : ") |+| prettyPrinter
+              .buildStringM(kv._2) |+| pure {
               if (i != ps.sortedList.size - 1) ", "
               else ""
             }
@@ -115,7 +110,7 @@ final case class PrettyPrinter(
       case EVarBody(EVar(v)) => buildStringM(v)
       case GBool(b)          => pure(b.toString)
       case GInt(i)           => pure(i.toString)
-      case GString(s)        => pure("\"" + s + "\"")
+      case GString(s)        => pure(s)
       case GUri(u)           => pure(s"`$u`")
       // TODO: Figure out if we can prevent ScalaPB from generating
       case ExprInstance.Empty => pure("Nil")
@@ -129,7 +124,7 @@ final case class PrettyPrinter(
     }
   }
 
-  def buildRemainderString(remainder: Option[Var]): Coeval[String] =
+  private def buildRemainderString(remainder: Option[Var]): Coeval[String] =
     remainder.fold(pure(""))(v => pure("...") |+| buildStringM(v))
 
   private def buildStringM(v: Var): Coeval[String] =
@@ -165,7 +160,7 @@ final case class PrettyPrinter(
     }
   }
 
-  def buildStringM(t: GeneratedMessage): Coeval[String] = buildStringM(t, 0)
+  private def buildStringM(t: GeneratedMessage): Coeval[String] = buildStringM(t, 0)
 
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   private def buildStringM(t: GeneratedMessage, indent: Int): Coeval[String] = Coeval.defer {
@@ -237,7 +232,7 @@ final case class PrettyPrinter(
               }
           } |+| pure("\n" + (indentStr * indent) + "}")
 
-      case u: GUnforgeable => buildStringM(u)
+      case g: GPrivate => pure("Unforgeable(0x" + Base16.encode(g.id.toByteArray) + ")")
       case c: Connective =>
         c.connectiveInstance match {
           case ConnectiveInstance.Empty => pure("")
@@ -265,7 +260,7 @@ final case class PrettyPrinter(
               par.news,
               par.exprs,
               par.matches,
-              par.unforgeables,
+              par.ids,
               par.connectives
             )
           ((false, pure("")) /: list) {
@@ -309,11 +304,11 @@ final case class PrettyPrinter(
       .map(i => s"$boundId${boundShift + i}")
       .mkString(", ")
 
-  def buildSeq[T <: GeneratedMessage](s: Seq[T]): Coeval[String] =
+  private def buildSeq[T <: GeneratedMessage](s: Seq[T]): Coeval[String] =
     (pure("") /: s.zipWithIndex) {
       case (string, (p, i)) =>
         string |+| buildStringM(p) |+| pure {
-          if (i != s.length - 1) ", "
+          if (i != s.length - 1) " "
           else ""
         }
     }
@@ -352,7 +347,7 @@ final case class PrettyPrinter(
       p.news.isEmpty &
       p.exprs.isEmpty &
       p.matches.isEmpty &
-      p.unforgeables.isEmpty &
+      p.ids.isEmpty &
       p.bundles.isEmpty &
       p.connectives.isEmpty
 
