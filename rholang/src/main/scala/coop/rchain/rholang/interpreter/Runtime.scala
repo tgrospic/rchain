@@ -229,7 +229,7 @@ object Runtime {
 
   def stdSystemProcesses[F[_]]: Seq[SystemProcess.Definition[F]] = Seq(
     // My processes
-    SystemProcess.Definition[F]("rho:io:http", FixedChannels.HTTP, 2, BodyRefs.HTTP, {
+    SystemProcess.Definition[F]("rho:io:http", FixedChannels.HTTP, 4, BodyRefs.HTTP, {
       ctx: SystemProcess.Context[F] =>
         ctx.systemProcesses.http
     }),

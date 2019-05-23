@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.Logger
 import coop.rchain.crypto.PublicKey
 import coop.rchain.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import coop.rchain.crypto.signatures.{Ed25519, Secp256k1}
-import coop.rchain.models.Expr.ExprInstance.{EListBody, ETupleBody, GBool, GString}
+import coop.rchain.models.Expr.ExprInstance.{EListBody, ETupleBody, GBool, GInt, GString}
 import coop.rchain.models._
 import coop.rchain.models.rholang.implicits._
 import coop.rchain.rholang.interpreter.Runtime.{BlockDataStorage, InvalidBlocks, RhoISpace}
@@ -109,17 +109,40 @@ object SystemProcesses {
         }
 
       def http: Contract[F] = {
-        case isContractCall(produce, Seq(urlPar, ack)) =>
+        case isContractCall(produce, Seq(verbPar, urlPar, postDataPar, ack)) =>
+          val reply = (success: Boolean, p: Seq[Par]) =>
+            produce(Seq(ETupleBody(ETuple(Seq(GBool(success): Par) ++ p))), ack)
           try {
+            val verb = getString(verbPar)
             val url  = getString(urlPar)
-            val http = Http(url).asString
+            val http =
+              if (verb == "POST") {
+                // POST request
+                val data = prettyPrinter.buildString(postDataPar)
+                Http(url)
+                  .header("content-type", "application/json")
+                  .option(HttpOptions.followRedirects(true))
+                  .postData(data)
+                  .timeout(connTimeoutMs = 1000, readTimeoutMs = 60000)
+                  .asString
+              } else {
+                // GET request
+                Http(url)
+                  .option(HttpOptions.followRedirects(true))
+                  .timeout(connTimeoutMs = 1000, readTimeoutMs = 60000)
+                  .asString
+              }
             if (http.code == 200)
               for {
-                _ <- produce(Seq(RhoType.String(http.body)), ack)
+                parRes <- ParBuilder[F].buildNormalizedTerm(http.body).attempt
+                _ <- parRes.fold(
+                      ex => reply(true, Seq(GString(http.body))),
+                      x => reply(true, Seq(x))
+                    )
               } yield ()
-            else F.delay(Console.println("Http error: " + http.code))
+            else reply(false, Seq(GInt(http.code.toLong)))
           } catch {
-            case ex: Throwable => F.delay(Console.println("Http error: " + ex.getMessage))
+            case ex: Throwable => reply(false, Seq(GString(ex.getMessage)))
           }
       }
 
@@ -154,6 +177,42 @@ object SystemProcesses {
             case ex: Throwable => reply(false, Seq(GString(ex.getMessage), GString("")))
           }
       }
+
+//      def sysProcessStream: Contract[F] = {
+//        case isContractCall(produce, Seq(cmdPar, par, ack)) =>
+//          val reply = (success: Boolean, p: Seq[Par]) =>
+//            produce(Seq(ETupleBody(ETuple(Seq(GBool(success): Par) ++ p))), ack)
+//          try {
+//            val io = new ProcessIO(writer, out => {
+//              scala.io.Source.fromInputStream(out).getLines.foreach(println)
+//            }, err => { scala.io.Source.fromInputStream(err).getLines.foreach(println) })
+//
+//            def writer(output: java.io.OutputStream) =
+//              output.write("Sent from RNode writer stream".getBytes)
+//
+//            val cmd     = getString(cmdPar)
+//            val process = Process(cmd)
+//            process run io
+//
+//            val execCmd = buildSeqString(par.exprs.head)
+//            println("Run command: " + execCmd)
+//            val output = execCmd.!!
+//            cmd match {
+//              case "run" => reply(true, Seq(GString(output)))
+//              case "run:rho" => {
+//                for {
+//                  parRes <- ParBuilder[F].buildNormalizedTerm(output).attempt
+//                  _ <- parRes.fold(
+//                        ex => reply(false, Seq(GString(ex.getMessage), GString(output))),
+//                        x => reply(true, Seq(x))
+//                      )
+//                } yield ()
+//              }
+//            }
+//          } catch {
+//            case ex: Throwable => reply(false, Seq(GString(ex.getMessage), GString("")))
+//          }
+//      }
 
       def buildSeqString(e: Expr): Seq[String] =
         e.exprInstance match {
