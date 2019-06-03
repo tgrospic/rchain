@@ -11,6 +11,7 @@ import coop.rchain.models._
 import scalapb.GeneratedMessage
 import coop.rchain.shared.StringOps._
 import cats.implicits._
+import coop.rchain.models.GUnforgeable.UnfInstance.{GDeployerAuthBody, GPrivateBody}
 import coop.rchain.shared.Printer
 import monix.eval.Coeval
 
@@ -49,6 +50,16 @@ final case class PrettyPrinterCmd(
   def buildString(e: Expr): String             = buildStringM(e).value.cap()
   def buildString(v: Var): String              = buildStringM(v).value.cap()
   def buildString(m: GeneratedMessage): String = buildStringM(m).value.cap()
+
+  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+  private def buildStringM(u: GUnforgeable): Coeval[String] = Coeval.defer {
+    u.unfInstance match {
+      case GPrivateBody(p) => pure("Unforgeable(0x" + Base16.encode(p.id.toByteArray) + ")")
+      case GDeployerAuthBody(da) =>
+        pure("DeployerAuth(0x" + Base16.encode(da.publicKey.toByteArray) + ")")
+      case _ => throw new Error(s"Attempted to print unknown GUnforgeable type: $u")
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   private def buildStringM(e: Expr): Coeval[String] = Coeval.defer {
@@ -232,7 +243,7 @@ final case class PrettyPrinterCmd(
               }
           } |+| pure("\n" + (indentStr * indent) + "}")
 
-      case g: GPrivate => pure("Unforgeable(0x" + Base16.encode(g.id.toByteArray) + ")")
+      case u: GUnforgeable => buildStringM(u)
       case c: Connective =>
         c.connectiveInstance match {
           case ConnectiveInstance.Empty => pure("")
@@ -260,7 +271,7 @@ final case class PrettyPrinterCmd(
               par.news,
               par.exprs,
               par.matches,
-              par.ids,
+              par.unforgeables,
               par.connectives
             )
           ((false, pure("")) /: list) {
@@ -347,7 +358,7 @@ final case class PrettyPrinterCmd(
       p.news.isEmpty &
       p.exprs.isEmpty &
       p.matches.isEmpty &
-      p.ids.isEmpty &
+      p.unforgeables.isEmpty &
       p.bundles.isEmpty &
       p.connectives.isEmpty
 
