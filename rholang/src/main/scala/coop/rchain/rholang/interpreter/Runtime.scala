@@ -140,9 +140,9 @@ object Runtime {
     val GET_INVALID_BLOCKS: Long           = 24L
     val REV_ADDRESS: Long                  = 25L
     // My special names
-    val HTTP: Long        = 25L
-    val SERIALIZE: Long   = 26L
-    val SYS_PROCESS: Long = 27L
+    val HTTP: Long        = 99L
+    val SERIALIZE: Long   = 98L
+    val SYS_PROCESS: Long = 97L
   }
 
   def byteName(b: Byte): Par = GPrivate(ByteString.copyFrom(Array[Byte](b)))
@@ -165,9 +165,9 @@ object Runtime {
     val GET_INVALID_BLOCKS: Par = byteName(14)
     val REV_ADDRESS: Par        = byteName(15)
     // My special names
-    val HTTP: Par        = byteName(15)
-    val SERIALIZE: Par   = byteName(16)
-    val SYS_PROCESS: Par = byteName(17)
+    val HTTP: Par        = byteName(99)
+    val SERIALIZE: Par   = byteName(98)
+    val SYS_PROCESS: Par = byteName(97)
   }
 
   private def introduceSystemProcesses[F[_]: Sync: _cost](
