@@ -48,6 +48,7 @@ import coop.rchain.node.api.{
   DeployGrpcService,
   DeployGrpcServiceV2,
   ProposeGrpcService,
+  ProposeGrpcServiceV2,
   ReplGrpcService
 }
 import coop.rchain.node.configuration.Configuration
@@ -72,6 +73,8 @@ import org.http4s.server.middleware._
 import org.http4s.server.Router
 import org.lmdbjava.Env
 import scala.concurrent.duration._
+
+import coop.rchain.casper.protocol.propose.ProposeServiceV2GrpcMonix
 
 @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
 class NodeRuntime private[node] (
@@ -521,14 +524,16 @@ class NodeRuntime private[node] (
                               grpcScheduler,
                               apiServers.deploy,
                               apiServers.deployV2,
-                              apiServers.propose
+                              apiServers.propose,
+                              apiServers.proposeV2
                             )
       internalApiServer <- api
                             .acquireInternalServer(
                               conf.grpcServer.portInternal,
                               grpcScheduler,
                               apiServers.repl,
-                              apiServers.propose
+                              apiServers.propose,
+                              apiServers.proposeV2
                             )
 
       prometheusReporter = new NewPrometheusReporter()
@@ -754,6 +759,7 @@ object NodeRuntime {
   final case class APIServers(
       repl: ReplGrpcMonix.Repl,
       propose: ProposeServiceGrpcMonix.ProposeService,
+      proposeV2: ProposeServiceV2GrpcMonix.ProposeServiceV2,
       deploy: DeployServiceGrpcMonix.DeployService,
       deployV2: DeployServiceV2GrpcMonix.DeployServiceV2
   )
@@ -778,6 +784,7 @@ object NodeRuntime {
     val deploy                = DeployGrpcService.instance(blockApiLock)
     val deploy2               = DeployGrpcServiceV2.instance(blockApiLock)
     val propose               = ProposeGrpcService.instance(blockApiLock)
-    APIServers(repl, propose, deploy, deploy2)
+    val propose2              = ProposeGrpcServiceV2.instance(blockApiLock)
+    APIServers(repl, propose, propose2, deploy, deploy2)
   }
 }
