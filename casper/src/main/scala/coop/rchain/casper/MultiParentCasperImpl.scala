@@ -14,7 +14,7 @@ import coop.rchain.casper.protocol._
 import coop.rchain.casper.util._
 import coop.rchain.casper.util.ProtoUtil._
 import coop.rchain.casper.util.comm.CommUtil
-import coop.rchain.casper.util.rholang._
+import coop.rchain.casper.util.rholang.{SystemDeploy, _}
 import coop.rchain.casper.util.rholang.RuntimeManager.StateHash
 import coop.rchain.catscontrib.BooleanF._
 import coop.rchain.catscontrib.ski._
@@ -40,6 +40,7 @@ import coop.rchain.crypto.signatures.Signed
 final case class CasperState(
     blockBuffer: Set[BlockHash] = Set.empty[BlockHash],
     deployHistory: Set[Signed[DeployData]] = Set.empty[Signed[DeployData]],
+    systemDeployHistory: Set[SystemDeploy] = Set.empty[SystemDeploy],
     dependencyDag: DoublyLinkedDag[BlockHash] = BlockDependencyDag.empty
 )
 

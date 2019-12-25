@@ -1,11 +1,11 @@
 package coop.rchain.casper.util.rholang
 
 import com.google.protobuf.ByteString
+import coop.rchain.crypto.PublicKey
 import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.models.NormalizerEnv.{Contains, ToEnvMap}
 import coop.rchain.rholang.interpreter.RhoType.Extractor
 import shapeless.Witness
-import coop.rchain.crypto.PublicKey
 
 abstract class SystemDeploy(initialRand: Blake2b512Random) {
 
@@ -19,7 +19,7 @@ abstract class SystemDeploy(initialRand: Blake2b512Random) {
   type Result
   type Env
 
-  final val rand = initialRand.copy()
+  val rand = initialRand.copy()
 
   final val `sys:casper:return`     = Witness("sys:casper:return")
   final val `sys:casper:deployerId` = Witness("sys:casper:deployerId")

@@ -134,7 +134,7 @@ object BlockApproverProtocol {
       numberOfActiveValidators: Int
   )(implicit runtimeManager: RuntimeManager[F]): F[Either[String, Unit]] = {
 
-    def validate: Either[String, (Seq[ProcessedDeploy], RChainState)] =
+    def validate: Either[String, (Seq[ProcessedDeploy], Seq[ProcessedSystemDeploy], RChainState)] =
       for {
         _ <- (candidate.requiredSigs == requiredSigs)
               .either(())
@@ -166,19 +166,21 @@ object BlockApproverProtocol {
             Long.MaxValue
           )
           .toSet
-        blockDeploys = block.body.deploys
+        blockDeploys       = block.body.deploys
+        blockSystemDeploys = block.body.systemDeploys
         _ <- (blockDeploys.size == genesisBlessedContracts.size)
               .either(())
               .or("Mismatch between number of candidate deploys and expected number of deploys.")
-      } yield (blockDeploys, block.body.state)
+      } yield (blockDeploys, blockSystemDeploys, block.body.state)
 
     (for {
-      result                    <- EitherT(validate.pure[F])
-      (blockDeploys, postState) = result
+      result                                        <- EitherT(validate.pure[F])
+      (blockDeploys, blockSystemDeploys, postState) = result
       stateHash <- EitherT(
                     runtimeManager
                       .replayComputeState(runtimeManager.emptyStateHash)(
                         blockDeploys,
+                        blockSystemDeploys,
                         BlockData.fromBlock(candidate.block),
                         Map.empty[BlockHash, Validator],
                         isGenesis = true

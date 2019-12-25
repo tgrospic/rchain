@@ -10,10 +10,10 @@ import coop.rchain.casper.CasperState.CasperStateCell
 import coop.rchain.casper.protocol._
 import coop.rchain.casper.util.ProtoUtil._
 import coop.rchain.casper.util.rholang.RuntimeManager.StateHash
-import coop.rchain.casper.util.rholang._
-import coop.rchain.casper.util.{ConstructDeploy, DagOperations, ProtoUtil}
+import coop.rchain.casper.util.rholang.costacc.SlashDeploy
+import coop.rchain.casper.util.rholang.{SystemDeploy, _}
+import coop.rchain.casper.util.{DagOperations, ProtoUtil}
 import coop.rchain.crypto.PublicKey
-import coop.rchain.crypto.codec.Base16
 import coop.rchain.crypto.signatures.Signed
 import coop.rchain.metrics.{Metrics, Span}
 import coop.rchain.models.BlockHash.BlockHash
@@ -59,27 +59,19 @@ object BlockCreator {
         parentMetadatas       <- EstimatorHelper.chooseNonConflicting(tipHashes, dag)
         maxBlockNumber        = ProtoUtil.maxBlockNumberMetadata(parentMetadatas)
         invalidLatestMessages <- ProtoUtil.invalidLatestMessages(dag)
-        slashingDeploys <- invalidLatestMessages.values.toList.traverse { invalidBlockHash =>
-                            val encodedInvalidBlockHash =
-                              Base16.encode(invalidBlockHash.toByteArray)
-                            // TODO: Do something useful with the result of "slash".
-                            ConstructDeploy
-                              .sourceDeployNowF(
-                                s"""
-                               #new rl(`rho:registry:lookup`), deployerId(`rho:rchain:deployerId`), posCh in {
-                               #  rl!(`rho:rchain:pos`, *posCh) |
-                               #  for(@(_, PoS) <- posCh) {
-                               #    @PoS!("slash", *deployerId, "$encodedInvalidBlockHash".hexToBytes(), "IGNOREFORNOW")
-                               #  }
-                               #}
-                               #
-                            """.stripMargin('#'),
-                                phloPrice = 0,
-                                sec = validatorIdentity.privateKey
-                              )
-                          }
+
+        slashingDeploys = invalidLatestMessages.values.toList.map(
+          invalidBlockHash =>
+            // TODO: Do something useful with the result of "slash".
+            SlashDeploy(
+              invalidBlockHash,
+              validatorIdentity.publicKey,
+              Tools.rng(invalidBlockHash.toByteArray)
+            )
+        )
+
         _ <- Cell[F, CasperState].modify { s =>
-              s.copy(deployHistory = s.deployHistory ++ slashingDeploys)
+              s.copy(systemDeployHistory = s.systemDeployHistory ++ slashingDeploys)
             }
 
         deploys          <- extractDeploys(dag, parentMetadatas, maxBlockNumber, expirationThreshold)
@@ -88,7 +80,7 @@ object BlockCreator {
         now              <- Time[F].currentMillis
         invalidBlocksSet <- dag.invalidBlocks
         invalidBlocks    = invalidBlocksSet.map(block => (block.blockHash, block.sender)).toMap
-        unsignedBlock <- if (deploys.nonEmpty) {
+        unsignedBlock <- if (deploys.nonEmpty || slashingDeploys.nonEmpty) {
                           SynchronyConstraintChecker[F]
                             .check(dag, runtimeManager, genesis, validator)
                             .ifM(
@@ -97,6 +89,7 @@ object BlockCreator {
                                 runtimeManager,
                                 parents,
                                 deploys,
+                                slashingDeploys,
                                 justifications,
                                 maxBlockNumber,
                                 validatorIdentity.publicKey,
@@ -185,6 +178,7 @@ object BlockCreator {
       runtimeManager: RuntimeManager[F],
       parents: Seq[BlockMessage],
       deploys: Seq[Signed[DeployData]],
+      systemDeploys: Seq[SystemDeploy],
       justifications: Seq[Justification],
       maxBlockNumber: Long,
       sender: PublicKey,
@@ -198,13 +192,14 @@ object BlockCreator {
       result <- InterpreterUtil.computeDeploysCheckpoint(
                  parents,
                  deploys,
+                 systemDeploys,
                  dag,
                  runtimeManager,
                  blockData,
                  invalidBlocks
                )
-      (preStateHash, postStateHash, processedDeploys) = result
-      newBonds                                        <- runtimeManager.computeBonds(postStateHash)
+      (preStateHash, postStateHash, processedDeploys, processedSystemDeploys) = result
+      newBonds                                                                <- runtimeManager.computeBonds(postStateHash)
       block = createBlock(
         blockData,
         parents,
@@ -212,6 +207,7 @@ object BlockCreator {
         preStateHash,
         postStateHash,
         processedDeploys,
+        processedSystemDeploys,
         newBonds,
         shardId,
         version
@@ -232,13 +228,14 @@ object BlockCreator {
       preStateHash: StateHash,
       postStateHash: StateHash,
       persistableDeploys: Seq[ProcessedDeploy],
+      persistableSystemDeploys: Seq[ProcessedSystemDeploy],
       newBonds: Seq[Bond],
       shardId: String,
       version: Long
   ): CreateBlockStatus = {
     val postState = RChainState(preStateHash, postStateHash, newBonds.toList, blockData.blockNumber)
 
-    val body   = Body(postState, persistableDeploys.toList)
+    val body   = Body(postState, persistableDeploys.toList, persistableSystemDeploys.toList)
     val header = blockHeader(body, p.map(_.blockHash), version, blockData.timeStamp)
     val block  = unsignedBlockProto(body, header, justifications, shardId)
     CreateBlockStatus.created(block)
