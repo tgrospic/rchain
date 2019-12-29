@@ -31,13 +31,13 @@ class MultiParentCasperMergeSpec
 
   val genesis = buildGenesis()
 
-  "HashSetCasper" should "handle multi-parent blocks correctly" ignore effectTest {
+  "HashSetCasper" should "handle multi-parent blocks correctly" in effectTest {
     TestNode.networkEff(genesis, networkSize = 2).use { nodes =>
       implicit val rm = nodes(1).runtimeManager
       for {
-        deployData0 <- ConstructDeploy.basicDeployData[Effect](0)
-        deployData1 <- ConstructDeploy.sourceDeployNowF("@1!(1) | for(@x <- @1){ @1!(x) }")
-        deployData2 <- ConstructDeploy.basicDeployData[Effect](2)
+        deployData0 <- ConstructDeploy.basicDeployData[Effect](0, sec = ConstructDeploy.defaultSec3)
+        deployData1 <- ConstructDeploy.sourceDeployNowF("@1!(1) | for(@x <- @1){ @1!(x) }", sec = ConstructDeploy.defaultSec4)
+        deployData2 <- ConstructDeploy.basicDeployData[Effect](2, sec = ConstructDeploy.defaultSec5)
         deploys = Vector(
           deployData0,
           deployData1,
@@ -66,7 +66,7 @@ class MultiParentCasperMergeSpec
     merges(echoContract(1), echoContract(2), Rho("Nil"))
   }
 
-  it should "not conflict on registry lookups" ignore effectTest {
+  it should "not conflict on registry lookups" in effectTest {
     val uri         = "rho:id:i1kuw4znrkazgbmc4mxe7ua4s1x41zd7qd8md96edxh1n87a5seht3"
     val toSign: Par = ETuple(Seq(GInt(0), GString("foo")))
     val toByteArray = Serialize[Par].encode(toSign).toArray

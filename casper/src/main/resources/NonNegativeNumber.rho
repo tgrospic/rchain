@@ -14,13 +14,14 @@
  9.  | 4,         | registry           | uri = rho:id:hxyadh1ffypra47ry9mk6b8r1i33ar1w9wjsez4khfe9huzrfcytx9
  ----+------------+--------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------
  */
-new  NonNegativeNumber, rs(`rho:registry:insertSigned:secp256k1`), uriOut in {
+new  NonNegativeNumber, rs(`rho:registry:insertSigned:secp256k1`), uriOut, out(`rho:io:stdout`) in {
   contract NonNegativeNumber(@init, return) = {
     new this, valueStore in {
       contract this(@"add", @x, success) = {
         if (x >= 0) {
           for(@v <- valueStore){
             if (v + x >= v) {
+              out!(("REV account ch: v + x", v, x, v + x, *valueStore)) |
               valueStore!(v + x) | success!(true)
             } else {
               //overflow
@@ -35,6 +36,7 @@ new  NonNegativeNumber, rs(`rho:registry:insertSigned:secp256k1`), uriOut in {
         if (x >= 0) {
           for(@v <- valueStore) {
             if (x <= v) {
+              out!(("REV account ch: v - x", v, -x, v - x, *valueStore)) |
               valueStore!(v - x) | success!(true)
             } else {
               valueStore!(v) | success!(false)
@@ -59,7 +61,7 @@ new  NonNegativeNumber, rs(`rho:registry:insertSigned:secp256k1`), uriOut in {
       }
     }
   } |
-  
+
   rs!(
     "04e1559d809924e564dce57e34646e155b144d2a504ce7ee519d7a5108fd42f1038d08d745e5ea21cb53d6aa7c7174a768fa373207a83bc947a20c6a02ece7a60e".hexToBytes(),
     (9223372036854775807, bundle+{*NonNegativeNumber}),
@@ -67,5 +69,5 @@ new  NonNegativeNumber, rs(`rho:registry:insertSigned:secp256k1`), uriOut in {
     *uriOut
   )
 }
-  
-  
+
+

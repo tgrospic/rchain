@@ -9,7 +9,7 @@ import coop.rchain.casper.genesis.contracts._
 import coop.rchain.casper.helper.BlockDagStorageTestFixture
 import coop.rchain.casper.helper.TestNode.makeBlockDagFileStorageConfig
 import coop.rchain.casper.protocol._
-import coop.rchain.casper.util.ConstructDeploy.{defaultPub, defaultPub2}
+import coop.rchain.casper.util.ConstructDeploy.{defaultPub, defaultPub2, defaultPub3, defaultPub4, defaultPub5}
 import coop.rchain.casper.util.rholang.RuntimeManager
 import coop.rchain.catscontrib.TaskContrib.TaskOps
 import coop.rchain.crypto.signatures.Secp256k1
@@ -56,7 +56,7 @@ object GenesisBuilder {
           numberOfActiveValidators = 100,
           validators = bonds.map(Validator.tupled).toSeq
         ),
-        vaults = Seq(predefinedVault(defaultPub), predefinedVault(defaultPub2)) ++
+        vaults = Seq(defaultPub, defaultPub2, defaultPub3, defaultPub4, defaultPub5).map(predefinedVault) ++
           bonds.toList.map {
             case (pk, stake) =>
               RevAddress.fromPublicKey(pk).map(Vault(_, stake))

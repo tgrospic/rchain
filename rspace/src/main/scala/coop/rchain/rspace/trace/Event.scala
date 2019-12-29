@@ -4,8 +4,8 @@ import cats.effect.Sync
 import coop.rchain.rspace.StableHashProvider._
 import coop.rchain.rspace.internal._
 import cats.implicits._
+import coop.rchain.crypto.codec.Base16
 import coop.rchain.rspace.Blake2b256Hash
-import coop.rchain.shared.Serialize
 import coop.rchain.rspace.internal.codecSeq
 import coop.rchain.shared.Serialize
 import scodec.Codec
@@ -48,6 +48,11 @@ final case class COMM(
 ) extends Event {
   def matches(datum: Datum[_], produceCounter: => Int): Boolean =
     timesRepeated.get(datum.source).exists(count => datum.persist || count == produceCounter)
+
+  override def toString = {
+    val producesStr = produces.map(_.toString).mkString(", ")
+    s"\n# COMM${consume}${producesStr}"
+  }
 }
 
 object COMM {
@@ -80,8 +85,10 @@ final case class Produce private (
 
   override def hashCode(): Int = hash.hashCode() * 47
 
-  override def toString: String =
-    s"Produce(channels: ${channelsHash.toString}, hash: ${hash.toString})"
+  override def toString: String = {
+    def toStr(hash: Blake2b256Hash) = Base16.encode(hash.bytes.toArray)
+    s"\nProduce: ${if (persistent) "!!" else "! "} ${toStr(channelsHash)}: ${toStr(hash)}"
+  }
 
 }
 
@@ -128,8 +135,10 @@ final case class Consume private (
 
   override def hashCode(): Int = hash.hashCode() * 47
 
-  override def toString: String =
-    s"Consume(channels: ${channelsHashes.toString}, hash: ${hash.toString}, persistent: $persistent)"
+  override def toString: String = {
+    def toStr(hash: Blake2b256Hash) = Base16.encode(hash.bytes.toArray)
+    s"\nConsume: ${if (persistent) "!!" else "! "} ${channelsHashes.map(toStr).mkString(", ")}: ${toStr(hash)}"
+  }
 }
 
 object Consume {

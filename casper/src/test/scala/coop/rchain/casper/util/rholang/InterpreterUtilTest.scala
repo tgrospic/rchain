@@ -135,22 +135,27 @@ class InterpreterUtilTest
     }
   }
 
-  it should "merge histories in case of multiple parents" ignore effectTest {
+  it should "merge histories in case of multiple parents" in effectTest {
 
     val b1Deploys = Vector(
-      "@5!(5)",
-      "@2!(2)",
-      "for(@a <- @2){ @456!(5 * a) }"
-    ).map(ConstructDeploy.sourceDeployNow)
+//      "new a, b, c, d in { a!(*b) | *c }",
+//      "@5!(5)",
+//      "@2!(2)",
+//      "for(@a <- @2){ @456!(5 * a) }"
+        "@456!(5)"
+    ).map(ConstructDeploy.sourceDeployNowSec(_, ConstructDeploy.defaultSec3))
 
     val b2Deploys = Vector(
-      "@1!(1)",
-      "for(@a <- @1){ @123!(5 * a) }"
-    ).map(ConstructDeploy.sourceDeployNow)
+//      "Nil"
+//      "@1!(1)",
+//      "for(@a <- @1){ @123!(5 * a) }"
+        "@123!(5)"
+    ).map(ConstructDeploy.sourceDeployNowSec(_, ConstructDeploy.defaultSec4))
 
     val b3Deploys = Vector(
+//      "Nil"
       "for(@a <- @123; @b <- @456){ @1!(a + b) }"
-    ).map(ConstructDeploy.sourceDeployNow)
+    ).map(ConstructDeploy.sourceDeployNowSec(_, ConstructDeploy.defaultSec5))
 
     /*
      * DAG Looks like this:
@@ -168,6 +173,7 @@ class InterpreterUtilTest
         for {
           b1 <- node1.addBlock(b1Deploys: _*)
           b2 <- node2.propagateBlock(b2Deploys: _*)(node1)
+//          b2 <- node2.addBlock(b2Deploys: _*)
           b3 <- node1.addBlock(b3Deploys: _*)
 
           _ = b3.header.parentsHashList.toSet shouldBe Set(b1, b2).map(_.blockHash)

@@ -12,22 +12,32 @@ import coop.rchain.shared.Time
 
 object ConstructDeploy {
 
+  // Key 1
   val defaultSec = PrivateKey(
     Base16.unsafeDecode("a68a6e6cca30f81bd24a719f3145d20e8424bd7b396309b0708a16c7d8000b76")
   )
   val defaultPub     = Secp256k1.toPublic(defaultSec)
   val defaultKeyPair = (defaultSec, defaultPub)
 
+  // Key 2
   val defaultSec2 = PrivateKey(
     Base16.unsafeDecode("5a0bde2f5857124b1379c78535b07a278e3b9cefbcacc02e62ab3294c02765a1")
   )
-  val defaultPub2     = Secp256k1.toPublic(defaultSec2)
-  val defaultKeyPair2 = (defaultSec2, defaultPub2)
+  val defaultPub2 = Secp256k1.toPublic(defaultSec2)
+
+  // Key 3
+  val (defaultSec3, defaultPub3) = Secp256k1.newKeyPair
+
+  // Key 4
+  val (defaultSec4, defaultPub4) = Secp256k1.newKeyPair
+
+  // Key 5
+  val (defaultSec5, defaultPub5) = Secp256k1.newKeyPair
 
   def sourceDeploy(
       source: String,
       timestamp: Long,
-      phloLimit: Long = 90000,
+      phloLimit: Long = 90011,
       phloPrice: Long = 1L,
       sec: PrivateKey = defaultSec
   ): Signed[DeployData] = {
@@ -48,6 +58,12 @@ object ConstructDeploy {
   ): Signed[DeployData] =
     sourceDeploy(source = source, timestamp = System.currentTimeMillis())
 
+  def sourceDeployNowSec(
+      source: String,
+      sec: PrivateKey = defaultSec
+  ): Signed[DeployData] =
+    sourceDeploy(source = source, timestamp = System.currentTimeMillis(), sec = sec)
+
   def sourceDeployNowF[F[_]: Time: Functor](
       source: String,
       phloLimit: Long = 90000,
@@ -59,9 +75,10 @@ object ConstructDeploy {
 
   // TODO: replace usages with basicSendDeployData
   def basicDeployData[F[_]: Monad: Time](
-      id: Int
+      id: Int,
+      sec: PrivateKey = defaultSec
   ): F[Signed[DeployData]] =
-    sourceDeployNowF(source = s"@$id!($id)")
+    sourceDeployNowF(source = s"@$id!($id)", sec = sec)
 
   def basicSendDeployData[F[_]: Monad: Time](
       id: Int

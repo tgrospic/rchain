@@ -1,17 +1,27 @@
 package coop.rchain.casper
 
+import coop.rchain.crypto.codec.Base16
 import coop.rchain.rspace.Blake2b256Hash
 import coop.rchain.rspace.trace._
 
 final case class TuplespaceEvent(
     incoming: TuplespaceOperation,
-    matched: Option[TuplespaceOperation]
-)
+    matched: Option[TuplespaceOperation],
+    note: String = ""
+) {
+  override def toString =
+    s"Incoming: ${incoming}, Match: ${matched}${note}"
+}
 final case class TuplespaceOperation(
     polarity: Polarity,
     cardinality: Cardinality,
     eventHash: Blake2b256Hash
-)
+) {
+  override def toString = {
+    val hash = Base16.encode(eventHash.bytes.toArray)
+    s"${polarity} ${cardinality} ${hash}"
+  }
+}
 
 trait Polarity
 case object Send    extends Polarity
@@ -59,7 +69,11 @@ object TuplespaceEvent {
           if (incoming == produceOp) consumeOp
           else produceOp
         )
-        Some(produce.channelsHash -> TuplespaceEvent(incoming, matched))
+
+        val consumeStr = consume.toString.stripLeading
+        val produceStr = produce.toString.stripLeading
+        val note = s"\n  # COMM\n  ${consumeStr}\n  ${produceStr}"
+        Some(produce.channelsHash -> TuplespaceEvent(incoming, matched, note))
       }
       case _ => None
     }
@@ -76,6 +90,9 @@ object TuplespaceEvent {
           thisMatched  <- ev.matched
           otherMatched <- other.matched
         } yield thisMatched == otherMatched && otherMatched.cardinality != NonLinear
+
+//        val samePersistEv = bothMatchedSameNonPersistentEvent.getOrElse(false)
+//        if (samePersistEv) println(s"Both Matched Same Non Persistent Event: ${samePersistEv}")
 
         if (bothPeeks) false
         else bothMatchedSameNonPersistentEvent.getOrElse(false)

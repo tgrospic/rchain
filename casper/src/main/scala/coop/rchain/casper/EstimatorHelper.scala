@@ -16,7 +16,13 @@ import coop.rchain.rspace.trace._
 
 import scala.collection.BitSet
 
-final case class BlockEvents(produces: Set[Produce], consumes: Set[Consume], comms: Set[COMM])
+final case class BlockEvents(produces: Set[Produce], consumes: Set[Consume], comms: Set[COMM]) {
+
+  override def toString: String =
+    s"\n# COMMs -------------------------------------------------------------------${comms.mkString}" +
+      s"\n# PRODUCES ----------------------------------------------------------------${produces.mkString}" +
+      s"\n# CONSUMES ----------------------------------------------------------------${consumes.mkString}"
+}
 
 object EstimatorHelper {
 
@@ -56,8 +62,16 @@ object EstimatorHelper {
       conflictsBecauseOfJoins = extractJoinedChannels(b1Events)
         .intersect(allChannels(b2Events))
         .nonEmpty || extractJoinedChannels(b2Events).intersect(allChannels(b1Events)).nonEmpty
-      conflicts = conflictsBecauseOfJoins || containConflictingEvents(b1Events, b2Events)
+      conflictInEvents = containConflictingEvents(b1Events, b2Events)
+      conflicts        = conflictsBecauseOfJoins || conflictInEvents
       _ <- if (conflicts) {
+            println("\n# Conflicts between two blocks")
+            println(s"  joins: ${conflictsBecauseOfJoins}, events: ${conflictInEvents}")
+            println("\n# BLOCK 1 events (COMMs, produces, consumes)")
+            print(b1Events)
+            println("\n# BLOCK 2 events (COMMs, produces, consumes)")
+            print(b2Events)
+
             Log[F].info(
               s"Blocks ${PrettyPrinter.buildString(b1.blockHash)} and ${PrettyPrinter
                 .buildString(b2.blockHash)} conflict."
@@ -83,6 +97,11 @@ object EstimatorHelper {
         b1  <- b1Events
         b2  <- b2Events
         res = b1.conflicts(b2)
+        _ = if (res) {
+          println("\n# CONFLICT Tuplespace event")
+          println(b1)
+          println(b2)
+        }
         // TODO: fail fast
       } yield (res)).contains(true)
 

@@ -36,7 +36,9 @@ new  PoS,
     transferFromBlockSender,
     rs(`rho:registry:insertSigned:secp256k1`),
     posId(`rho:rchain:deployerId`),
-    uriOut in {
+    uriOut,
+    out(`rho:io:stdout`)
+in {
   registryLookup!(`rho:rchain:revVault`, *revVaultCh) |
   registryLookup!(`rho:lang:listOps`, *listOpsCh) |
 
@@ -65,7 +67,7 @@ new  PoS,
           @ListOps!("parMap", range, *makeVault, *perActiveValidatorPosVaultsCh)
         }
       } |
-      
+
       for(@posRevAddress <- posRevAddressCh;
           @posAuthKey <- posAuthKeyCh) {
 
@@ -192,9 +194,12 @@ new  PoS,
 
             new currentDeployerData in {
               contract PoS (@"chargeDeploy", @deployerId, @amount, return) = {
+//                currentDeployerData!((deployerId, amount)) |
+//                return!((true, "100000"))
                 new depositCh, tmpCh in {
                   getMVar!(*stateCh, *tmpCh) |
                   for (@state <- tmpCh) {
+                    out!(("chargeDeploy", amount, deployerId)) |
                     deposit!(deployerId, amount, state.get("activeValidators"), *depositCh) |
                     for(@depositResult <- depositCh){
                       match depositResult {
@@ -321,167 +326,168 @@ new  PoS,
                   removeQuarantinedWithdrawers,
                   payValidators
               in {
-                new blockDataCh, mvarProcessCh,
-                    getBlockData(`rho:block:data`),
-                    accDepositsDoneCh,
-                    commitRewardsCh,
-                    newValidatorsCh, removeQuarantinedCh, paymentDoneCh
-                in {
-                  getBlockData!(*blockDataCh) |
+              //   new blockDataCh, mvarProcessCh,
+              //       getBlockData(`rho:block:data`),
+              //       accDepositsDoneCh,
+              //       commitRewardsCh,
+              //       newValidatorsCh, removeQuarantinedCh, paymentDoneCh
+              //   in {
+              //     getBlockData!(*blockDataCh) |
 
-                  runMVar!(*stateCh, *mvarProcessCh, *ackCh) |
-                  for(_, @blockNumber, _ <- blockDataCh;
-                      @state, mvarResultCh <- mvarProcessCh) {
-                    // Before choosing new active validators and paying out any withdrawers,
-                    // deposits have to be accumulated into one vault for now.
-                    accumulateDeposits!(posRevAddress, *accDepositsDoneCh) |
+              //     runMVar!(*stateCh, *mvarProcessCh, *ackCh) |
+              //     for(_, @blockNumber, _ <- blockDataCh;
+              //         @state, mvarResultCh <- mvarProcessCh) {
+              //       // Before choosing new active validators and paying out any withdrawers,
+              //       // deposits have to be accumulated into one vault for now.
+              //       accumulateDeposits!(posRevAddress, *accDepositsDoneCh) |
 
-                    changeEpoch!(
-                      blockNumber,
-                      state.get("allBonds"),
-                      state.get("activeValidators"),
-                      state.get("withdrawers"),
-                      *newValidatorsCh)|
+              //       changeEpoch!(
+              //         blockNumber,
+              //         state.get("allBonds"),
+              //         state.get("activeValidators"),
+              //         state.get("withdrawers"),
+              //         *newValidatorsCh)|
 
-                    commitRewards!(
-                      state.get("pendingRewards"),
-                      state.get("committedRewards"),
-                      *commitRewardsCh) |
+              //       commitRewards!(
+              //         state.get("pendingRewards"),
+              //         state.get("committedRewards"),
+              //         *commitRewardsCh) |
 
-                    for (@committedRewards <- commitRewardsCh) {
+              //       for (@committedRewards <- commitRewardsCh) {
 
-                      removeQuarantinedWithdrawers!(
-                        blockNumber,
-                        state.get("allBonds"),
-                        state.get("withdrawers"),
-                        committedRewards,
-                        *removeQuarantinedCh)
-                    } |
+              //         removeQuarantinedWithdrawers!(
+              //           blockNumber,
+              //           state.get("allBonds"),
+              //           state.get("withdrawers"),
+              //           committedRewards,
+              //           *removeQuarantinedCh)
+              //       } |
 
-                    for(@newValidators <- newValidatorsCh;
-                        @(payments, newBonds, newWithdrawers, newRewards) <- removeQuarantinedCh;
-                        _ <- accDepositsDoneCh) {
+              //       for(@newValidators <- newValidatorsCh;
+              //           @(payments, newBonds, newWithdrawers, newRewards) <- removeQuarantinedCh;
+              //           _ <- accDepositsDoneCh) {
 
-                      payValidators!(payments, *paymentDoneCh) |
+              //         payValidators!(payments, *paymentDoneCh) |
 
-                      for (_ <- paymentDoneCh) {
-                        mvarResultCh!(
-                          {
-                            "pendingRewards":{},
-                            "committedRewards":newRewards,
-                            "activeValidators":newValidators,
-                            "withdrawers":newWithdrawers,
-                            "allBonds":newBonds,
-                            "randomImages":{},
-                            "randomNumbers":{},
-                          },
-                          Nil)
-                      }
-                    }
-                  }
-                } |
+              //         for (_ <- paymentDoneCh) {
+              //           mvarResultCh!(
+              //             {
+              //               "pendingRewards":{},
+              //               "committedRewards":newRewards,
+              //               "activeValidators":newValidators,
+              //               "withdrawers":newWithdrawers,
+              //               "allBonds":newBonds,
+              //               "randomImages":{},
+              //               "randomNumbers":{},
+              //             },
+              //             Nil)
+              //         }
+              //       }
+              //     }
+              // } |
 
-                new moveFunds in {
-                  contract moveFunds(@(unf, _, vault), returnCh) = {
-                    new balanceCh, unfAuthKeyCh, transferDoneCh in {
-                      @vault!("balance", *balanceCh) |
-                      for (@balance <- balanceCh) {
-                        if (balance > 0) {
-                          @RevVault!("unforgeableAuthKey", unf, *unfAuthKeyCh) |
-                          for (@authKey <- unfAuthKeyCh) {
-                            @vault!("transfer", posRevAddress, balance, authKey, *transferDoneCh) |
-                            for (@(true, Nil) <- transferDoneCh) {
-                              returnCh!(true)
-                            }
-                          }
-                        } else {
-                          returnCh!(true)
-                        }
-                      }
-                    }
-                  } |
+                // new moveFunds in {
+                //   contract moveFunds(@(unf, _, vault), returnCh) = {
+                //     new balanceCh, unfAuthKeyCh, transferDoneCh in {
+                //       @vault!("balance", *balanceCh) |
+                //       for (@balance <- balanceCh) {
+                //         if (balance > 0) {
+                //           @RevVault!("unforgeableAuthKey", unf, *unfAuthKeyCh) |
+                //           for (@authKey <- unfAuthKeyCh) {
+                //             @vault!("transfer", posRevAddress, balance, authKey, *transferDoneCh) |
+                //             for (@(true, Nil) <- transferDoneCh) {
+                //               returnCh!(true)
+                //             }
+                //           }
+                //         } else {
+                //           returnCh!(true)
+                //         }
+                //       }
+                //     }
+                //   } |
 
-                  contract accumulateDeposits(destRevAddress, ackCh) = {
-                    for(@vaults <<- perActiveValidatorPosVaultsCh) {
-                      @ListOps!("parMap", vaults, *moveFunds, *ackCh)
-                    }
-                  }
-                } |
+                //   contract accumulateDeposits(destRevAddress, ackCh) = {
+                //     for(@vaults <<- perActiveValidatorPosVaultsCh) {
+                //       @ListOps!("parMap", vaults, *moveFunds, *ackCh)
+                //     }
+                //   }
+                // } |
 
-                new payValidator in {
-                  contract payValidator (@(pk, amount), returnCh) = {
-                    new vaultCh, revAddressCh in {
-                      revAddressOps!("fromPublicKey", pk, *revAddressCh) |
-                      for (@toRevAddress <- revAddressCh) {
-                        @posVault!("transfer", toRevAddress, amount, posAuthKey, *returnCh)
-                      }
-                    }
-                  } |
-                  contract payValidators(@payments, ackCh) = {
-                    @ListOps!("unorderedParMap", payments, *payValidator, *ackCh)
-                  }
-                } |
+                // new payValidator in {
+                //   contract payValidator (@(pk, amount), returnCh) = {
+                //     new vaultCh, revAddressCh in {
+                //       revAddressOps!("fromPublicKey", pk, *revAddressCh) |
+                //       for (@toRevAddress <- revAddressCh) {
+                //         @posVault!("transfer", toRevAddress, amount, posAuthKey, *returnCh)
+                //       }
+                //     }
+                //   } |
+                //   contract payValidators(@payments, ackCh) = {
+                //     @ListOps!("unorderedParMap", payments, *payValidator, *ackCh)
+                //   }
+                // } |
 
-                new commitReward in {
-                  contract commitReward(@(pk, pending), @acc, resultCh) = {
-                    resultCh!(acc.set(pk, acc.getOrElse(pk, 0) + pending))
-                  } |
-                  contract commitRewards(@pendingRewards, @rewards, newRewardsCh) = {
-                    @ListOps!("fold", pendingRewards.toList(), rewards, *commitReward, *newRewardsCh)
-                  }
-                } |
+                // new commitReward in {
+                //   contract commitReward(@(pk, pending), @acc, resultCh) = {
+                //     resultCh!(acc.set(pk, acc.getOrElse(pk, 0) + pending))
+                //   } |
+                //   contract commitRewards(@pendingRewards, @rewards, newRewardsCh) = {
+                //     @ListOps!("fold", pendingRewards.toList(), rewards, *commitReward, *newRewardsCh)
+                //   }
+                // } |
 
-                contract changeEpoch(@currentBlockNumber, @allBonds, @activeValidators, @withdrawers, resultCh) = {
-                  if (currentBlockNumber % $$epochLength$$ == 0) {
-                    pickActiveValidators!(allBonds, withdrawers, *resultCh)
-                  } else {
-                    resultCh!(activeValidators)
-                  }
-                } |
+                // contract changeEpoch(@currentBlockNumber, @allBonds, @activeValidators, @withdrawers, resultCh) = {
+                //   if (currentBlockNumber % $$epochLength$$ == 0) {
+                //     pickActiveValidators!(allBonds, withdrawers, *resultCh)
+                //   } else {
+                //     resultCh!(activeValidators)
+                //   }
+                // } |
 
-                contract removeQuarantinedWithdrawers(@currentBlockNumber, @allBonds, @withdrawers, @rewards, returnCh) = {
-                  new quarantinedValidatorsCh,
-                      validatorsToWithdrawListCh,
-                      isQuarantineFinished,
-                      notWithdrawn,
-                      newBondsListCh,
-                      newWithdrawersListCh,
-                      newRewardsListCh,
-                      paymentsCh, computePay
-                  in {
-                    @ListOps!("filter", withdrawers.toList(), *isQuarantineFinished, *quarantinedValidatorsCh) |
-                    for (@quarantinedValidators <- quarantinedValidatorsCh) {
-                      @ListOps!("map", quarantinedValidators, *fst, *validatorsToWithdrawListCh) |
-                      for (@validatorsToWithdrawList <- validatorsToWithdrawListCh) {
-                        @ListOps!("map", validatorsToWithdrawList, *computePay, *paymentsCh) |
-                        contract computePay(@pk, resultCh) = {
-                          resultCh!((pk, allBonds.get(pk) + rewards.getOrElse(pk, 0)))
-                        } |
+                // contract removeQuarantinedWithdrawers(@currentBlockNumber, @allBonds, @withdrawers, @rewards, returnCh) = {
+                //   new quarantinedValidatorsCh,
+                //       validatorsToWithdrawListCh,
+                //       isQuarantineFinished,
+                //       notWithdrawn,
+                //       newBondsListCh,
+                //       newWithdrawersListCh,
+                //       newRewardsListCh,
+                //       paymentsCh, computePay
+                //   in {
+                //     @ListOps!("filter", withdrawers.toList(), *isQuarantineFinished, *quarantinedValidatorsCh) |
+                //     for (@quarantinedValidators <- quarantinedValidatorsCh) {
+                //       @ListOps!("map", quarantinedValidators, *fst, *validatorsToWithdrawListCh) |
+                //       for (@validatorsToWithdrawList <- validatorsToWithdrawListCh) {
+                //         @ListOps!("map", validatorsToWithdrawList, *computePay, *paymentsCh) |
+                //         contract computePay(@pk, resultCh) = {
+                //           resultCh!((pk, allBonds.get(pk) + rewards.getOrElse(pk, 0)))
+                //         } |
 
-                        match validatorsToWithdrawList.toSet() {
-                          validatorsToWithdrawSet => {
-                            @ListOps!("filter", allBonds.toList(), *notWithdrawn, *newBondsListCh) |
-                            @ListOps!("filter", withdrawers.toList(), *notWithdrawn, *newWithdrawersListCh) |
-                            @ListOps!("filter", rewards.toList(), *notWithdrawn, *newRewardsListCh) |
+                //         match validatorsToWithdrawList.toSet() {
+                //           validatorsToWithdrawSet => {
+                //             @ListOps!("filter", allBonds.toList(), *notWithdrawn, *newBondsListCh) |
+                //             @ListOps!("filter", withdrawers.toList(), *notWithdrawn, *newWithdrawersListCh) |
+                //             @ListOps!("filter", rewards.toList(), *notWithdrawn, *newRewardsListCh) |
 
-                            for (@newWithdrawersList <- newWithdrawersListCh;
-                                 @newBondsList <- newBondsListCh;
-                                 @newRewardsList <- newRewardsListCh;
-                                 @payments <- paymentsCh) {
-                              returnCh!((payments, newBondsList.toMap(), newWithdrawersList.toMap(), newRewardsList.toMap()))
-                            } |
+                //             for (@newWithdrawersList <- newWithdrawersListCh;
+                //                  @newBondsList <- newBondsListCh;
+                //                  @newRewardsList <- newRewardsListCh;
+                //                  @payments <- paymentsCh) {
+                //               returnCh!((payments, newBondsList.toMap(), newWithdrawersList.toMap(), newRewardsList.toMap()))
+                //             } |
 
-                            contract notWithdrawn(@(pk, _), resultCh) = { resultCh!(not validatorsToWithdrawSet.contains(pk))}
-                          }
-                        }
-                      }
-                    } |
+                //             contract notWithdrawn(@(pk, _), resultCh) = { resultCh!(not validatorsToWithdrawSet.contains(pk))}
+                //           }
+                //         }
+                //       }
+                //     } |
 
-                    contract isQuarantineFinished(@(_, blockNumber), resultCh) = {
-                      resultCh!(blockNumber >= currentBlockNumber)
-                    }
-                  }
-                }
+                //     contract isQuarantineFinished(@(_, blockNumber), resultCh) = {
+                //       resultCh!(blockNumber >= currentBlockNumber)
+                //     }
+                //   }
+                // }
+                // ---- END closeBlock
               }
             } |
 

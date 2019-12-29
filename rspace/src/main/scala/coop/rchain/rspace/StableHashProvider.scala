@@ -24,7 +24,7 @@ object StableHashProvider {
   def hashMany[C](channels: Seq[C])(implicit serializeC: Serialize[C]): Seq[Blake2b256Hash] =
     toOrderedByteVectors(channels).map(Blake2b256Hash.create)
 
-  def hash[C, P, K](
+  def hash[P, K](
       encodedChannels: Seq[ByteVector],
       patterns: Seq[P],
       continuation: K,
