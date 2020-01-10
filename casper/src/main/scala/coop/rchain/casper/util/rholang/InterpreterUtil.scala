@@ -176,14 +176,14 @@ object InterpreterUtil {
       (startHash, processedDeploys) = resultDeploys
       resultSystemDeploys <- {
         import cats.instances.list._
-        systemDeploys.toList.foldM((startHash, List.empty[ProcessedSystemDeploy])) {
+        systemDeploys.toList.foldM((startHash, Vector.empty[ProcessedSystemDeploy])) {
           case ((startHash, processedSystemDeploys), sd) =>
             runtimeManager.playSystemDeploy(startHash)(sd) >>= {
               case PlaySucceeded(stateHash, processedSystemDeploy, _) =>
                 (stateHash, processedSystemDeploys :+ processedSystemDeploy).pure[F]
               case PlayFailed(_) =>
                 new Exception("Unexpected system error during play of system deploy")
-                  .raiseError[F, (StateHash, List[ProcessedSystemDeploy])]
+                  .raiseError[F, (StateHash, Vector[ProcessedSystemDeploy])]
             }
         }
       }
