@@ -134,12 +134,15 @@ object BlockApproverProtocol {
       numberOfActiveValidators: Int
   )(implicit runtimeManager: RuntimeManager[F]): F[Either[String, Unit]] = {
 
-    def validate: Either[String, (Seq[ProcessedDeploy], Seq[ProcessedSystemDeploy], RChainState)] =
+    def validate: Either[String, (Seq[ProcessedDeploy], RChainState)] =
       for {
         _ <- (candidate.requiredSigs == requiredSigs)
               .either(())
               .or("Candidate didn't have required signatures number.")
         block = candidate.block
+        _ <- (block.body.systemDeploys.isEmpty)
+              .either(())
+              .or("Candidate must not contain system deploys.")
         blockBonds = block.body.state.bonds.map {
           case Bond(validator, stake) => validator -> stake
         }.toMap
@@ -166,21 +169,20 @@ object BlockApproverProtocol {
             Long.MaxValue
           )
           .toSet
-        blockDeploys       = block.body.deploys
-        blockSystemDeploys = block.body.systemDeploys
+        blockDeploys = block.body.deploys
         _ <- (blockDeploys.size == genesisBlessedContracts.size)
               .either(())
               .or("Mismatch between number of candidate deploys and expected number of deploys.")
-      } yield (blockDeploys, blockSystemDeploys, block.body.state)
+      } yield (blockDeploys, block.body.state)
 
     (for {
-      result                                        <- EitherT(validate.pure[F])
-      (blockDeploys, blockSystemDeploys, postState) = result
+      result                    <- EitherT(validate.pure[F])
+      (blockDeploys, postState) = result
       stateHash <- EitherT(
                     runtimeManager
                       .replayComputeState(runtimeManager.emptyStateHash)(
                         blockDeploys,
-                        blockSystemDeploys,
+                        List.empty,
                         BlockData.fromBlock(candidate.block),
                         Map.empty[BlockHash, Validator],
                         isGenesis = true
