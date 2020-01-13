@@ -19,6 +19,7 @@ import coop.rchain.rholang.interpreter.ParBuilder
 import coop.rchain.rholang.interpreter.Runtime.BlockData
 import coop.rchain.shared.{Log, LogSource}
 import com.google.protobuf.ByteString
+import coop.rchain.casper.protocol.ProcessedSystemDeploy.Failed
 import coop.rchain.casper.util.rholang.SystemDeployPlayResult.{PlayFailed, PlaySucceeded}
 import coop.rchain.crypto.signatures.Signed
 import monix.eval.Coeval
@@ -181,8 +182,8 @@ object InterpreterUtil {
             runtimeManager.playSystemDeploy(startHash)(sd) >>= {
               case PlaySucceeded(stateHash, processedSystemDeploy, _) =>
                 (stateHash, processedSystemDeploys :+ processedSystemDeploy).pure[F]
-              case PlayFailed(_) =>
-                new Exception("Unexpected system error during play of system deploy")
+              case PlayFailed(Failed(_, errorMsg)) =>
+                new Exception("Unexpected system error during play of system deploy: " + errorMsg)
                   .raiseError[F, (StateHash, Vector[ProcessedSystemDeploy])]
             }
         }
