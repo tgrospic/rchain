@@ -14,8 +14,8 @@ import scodec.bits.ByteVector
 final case class SlashDeploy(
     invalidBlockHash: BlockHash,
     pk: PublicKey,
-    override val rand: Blake2b512Random
-) extends SystemDeploy(rand) {
+    initialRand: Blake2b512Random
+) extends SystemDeploy(initialRand) {
   import coop.rchain.models._
   import Expr.ExprInstance._
   import rholang.{implicits => toPar}
