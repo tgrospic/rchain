@@ -215,7 +215,7 @@ new  PoS,
                         }
                       }
                     } else {
-                      return!(Nil)
+                      return!((false, "Invalid system auth token"))
                     }
                   }
                 }
@@ -295,7 +295,7 @@ new  PoS,
                         }
                       }
                     } else {
-                      return!(Nil)
+                      return!((false, "Invalid system auth token"))
                     }
                   }
                 }
@@ -333,7 +333,7 @@ new  PoS,
                       }
                     }
                   } else {
-                    returnCh!(Nil)
+                    returnCh!((false, "Invalid system auth token"))
                   }
                 }
               }
@@ -513,7 +513,7 @@ new  PoS,
                       }
                     }
                   } else {
-                    ackCh!(Nil)
+                    ackCh!((false, "Invalid system auth token"))
                   }
                 }
               }
