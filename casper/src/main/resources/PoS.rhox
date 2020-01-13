@@ -251,9 +251,6 @@ new  PoS,
                 }
               } |
 
-              // Note: under no circumstances should this method be merged as is.
-              //       this method, along with "chargeDeploy", "closeBlock", and "slash"
-              //       must be made private, as they're only used in the protocol.
               contract PoS (@"refundDeploy", @refundAmount, @sysAuthToken, return) = {
                 new isValidTokenCh in {
                   sysAuthTokenOps!("check", sysAuthToken, *isValidTokenCh) |
