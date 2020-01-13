@@ -19,7 +19,7 @@ abstract class SystemDeploy(initialRand: Blake2b512Random) {
   type Result
   type Env
 
-  val rand = initialRand.copy()
+  final val rand = initialRand.copy()
 
   final val `sys:casper:deployerId` = Witness("sys:casper:deployerId")
   final val `sys:casper:authToken`  = Witness("sys:casper:authToken")
