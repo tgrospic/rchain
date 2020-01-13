@@ -358,33 +358,30 @@ object ProcessedDeploy {
   }
 }
 
-final case class SlashSystemDeployData(invalidBlockHash: BlockHash, issuerPublicKey: PublicKey)
+sealed trait SystemDeployData
 
-final case class SystemDeployData(maybeSlashData: Option[SlashSystemDeployData])
+final case class SlashSystemDeployData(invalidBlockHash: BlockHash, issuerPublicKey: PublicKey)
+    extends SystemDeployData
+object Empty extends SystemDeployData
 
 object SystemDeployData {
-  val empty: SystemDeployData = SystemDeployData(maybeSlashData = none)
+  val empty: SystemDeployData = Empty
 
   def from(invalidBlockHash: BlockHash, issuerPublicKey: PublicKey): SystemDeployData =
-    SystemDeployData(maybeSlashData = SlashSystemDeployData(invalidBlockHash, issuerPublicKey).some)
+    SlashSystemDeployData(invalidBlockHash, issuerPublicKey)
 
   def fromProto(proto: SystemDeployDataProto): SystemDeployData =
-    SystemDeployData(
-      maybeSlashData =
-        if (!proto.invalidBlockHash.isEmpty && !proto.issuerPublicKey.isEmpty)
-          SlashSystemDeployData(proto.invalidBlockHash, PublicKey(proto.issuerPublicKey)).some
-        else
-          none
-    )
+    if (!proto.invalidBlockHash.isEmpty && !proto.issuerPublicKey.isEmpty)
+      SlashSystemDeployData(proto.invalidBlockHash, PublicKey(proto.issuerPublicKey))
+    else
+      Empty
 
-  def toProto(dd: SystemDeployData): SystemDeployDataProto =
-    SystemDeployDataProto()
-      .withInvalidBlockHash(dd.maybeSlashData.map(_.invalidBlockHash).getOrElse(ByteString.EMPTY))
-      .withIssuerPublicKey(
-        dd.maybeSlashData
-          .map(slashData => ByteString.copyFrom(slashData.issuerPublicKey.bytes))
-          .getOrElse(ByteString.EMPTY)
-      )
+  def toProto(sdd: SystemDeployData): SystemDeployDataProto =
+    sdd match {
+      case SlashSystemDeployData(invalidBlockHash, issuerPublicKey) =>
+        SystemDeployDataProto(invalidBlockHash, ByteString.copyFrom(issuerPublicKey.bytes))
+      case Empty => SystemDeployDataProto(ByteString.EMPTY, ByteString.EMPTY)
+    }
 }
 
 sealed trait ProcessedSystemDeploy {

@@ -469,12 +469,10 @@ class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log](
   )(processedSystemDeploy: ProcessedSystemDeploy): F[Option[ReplayFailure]] = {
     import processedSystemDeploy._
 
-    systemDeploy.maybeSlashData match {
-      case Some(slashDeployData) =>
-        val slashDeploy = {
-          import slashDeployData._
+    systemDeploy match {
+      case SlashSystemDeployData(invalidBlockHash, issuerPublicKey) =>
+        val slashDeploy =
           SlashDeploy(invalidBlockHash, issuerPublicKey, Tools.rng(invalidBlockHash.toByteArray))
-        }
 
         val deployEvaluator = EitherT
           .liftF {
@@ -508,8 +506,8 @@ class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log](
                               }
                               .flatMap { _ =>
                                 /* This deployment represents either correct program `Some(result)`,
-                                  or we have a failed pre-charge (`None`) but we agree on that it failed.
-                                  In both cases we want to check reply data and see if everything is in order */
+                  or we have a failed pre-charge (`None`) but we agree on that it failed.
+                  In both cases we want to check reply data and see if everything is in order */
                                 runtime.replaySpace.checkReplayData().attemptT.leftMap {
                                   case replayException: ReplayException =>
                                     ReplayFailure.unusedCOMMEvent(replayException)
@@ -523,7 +521,7 @@ class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log](
           } yield failureOption
         }
 
-      case None => ReplayFailure.internalError(new Exception("Expected system deploy")).some.pure
+      case Empty => ReplayFailure.internalError(new Exception("Expected system deploy")).some.pure
     }
   }
 
