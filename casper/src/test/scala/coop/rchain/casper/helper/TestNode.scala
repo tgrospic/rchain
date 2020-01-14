@@ -10,6 +10,7 @@ import cats.effect.{Concurrent, Resource, Sync}
 import cats.implicits._
 import coop.rchain.blockstorage._
 import coop.rchain.blockstorage.dag.{BlockDagFileStorage, BlockDagStorage}
+import coop.rchain.blockstorage.deploy.{DeployStorage, InMemDeployStorage, LMDBDeployStorage}
 import coop.rchain.blockstorage.finality.{LastFinalizedFileStorage, LastFinalizedStorage}
 import coop.rchain.casper.CasperState.CasperStateCell
 import coop.rchain.casper.MultiParentCasper.ignoreDoppelgangerCheck
@@ -56,6 +57,7 @@ class TestNode[F[_]](
     blockProcessingLock: Semaphore[F],
     synchronyConstraintThreshold: Double,
     maxNumberOfParents: Int = Estimator.UnlimitedParents,
+    maxParentDepth: Option[Int] = None,
     shardId: String = "rchain",
     finalizationRate: Int = 1
 )(
@@ -63,6 +65,7 @@ class TestNode[F[_]](
     implicit val blockStore: BlockStore[F],
     implicit val blockDagStorage: BlockDagStorage[F],
     implicit val lastFinalizedStorage: LastFinalizedStorage[F],
+    implicit val deployStorage: DeployStorage[F],
     val metricEff: Metrics[F],
     val span: Span[F],
     val casperState: CasperStateCell[F],
@@ -78,7 +81,7 @@ class TestNode[F[_]](
   implicit val lastFinalizedBlockCalculator = LastFinalizedBlockCalculator[F](0f)
   implicit val synchronyConstraintChecker =
     SynchronyConstraintChecker[F](synchronyConstraintThreshold)
-  implicit val estimator = Estimator[F](maxNumberOfParents)
+  implicit val estimator = Estimator[F](maxNumberOfParents, maxParentDepth)
   implicit val rpConfAsk = createRPConfAsk[F](local)
   implicit val eventBus  = EventPublisher.noop[F]
 
@@ -268,7 +271,8 @@ object TestNode {
       networkSize: Int,
       storageSize: Long = 1024L * 1024 * 10,
       synchronyConstraintThreshold: Double = 0d,
-      maxNumberOfParents: Int = Estimator.UnlimitedParents
+      maxNumberOfParents: Int = Estimator.UnlimitedParents,
+      maxParentDepth: Option[Int] = None
   )(implicit scheduler: Scheduler): Resource[Effect, IndexedSeq[TestNode[Effect]]] =
     networkF[Effect](
       genesis.validatorSks.take(networkSize).toVector,
@@ -276,7 +280,8 @@ object TestNode {
       genesis.storageDirectory,
       Resources.mkRuntimeManagerWithHistoryAt[Effect](_)(storageSize),
       synchronyConstraintThreshold,
-      maxNumberOfParents
+      maxNumberOfParents,
+      maxParentDepth
     )(
       Concurrent[Effect],
       TestNetwork.empty[Effect]
@@ -288,7 +293,8 @@ object TestNode {
       storageMatrixPath: Path,
       createRuntime: Path => Resource[F, (RuntimeManager[F], RhoHistoryRepository[F])],
       synchronyConstraintThreshold: Double,
-      maxNumberOfParents: Int
+      maxNumberOfParents: Int,
+      maxParentDepth: Option[Int]
   ): Resource[F, IndexedSeq[TestNode[F]]] = {
     val n     = sks.length
     val names = (1 to n).map(i => s"node-$i")
@@ -312,7 +318,8 @@ object TestNode {
               logicalTime,
               createRuntime,
               synchronyConstraintThreshold,
-              maxNumberOfParents
+              maxNumberOfParents,
+              maxParentDepth
             )
         }
         .map(_.toVector)
@@ -351,7 +358,8 @@ object TestNode {
       logicalTime: LogicalTime[F],
       createRuntime: Path => Resource[F, (RuntimeManager[F], RhoHistoryRepository[F])],
       synchronyConstraintThreshold: Double,
-      maxNumberOfParents: Int
+      maxNumberOfParents: Int,
+      maxParentDepth: Option[Int]
   ): Resource[F, TestNode[F]] = {
     val tle                = new TransportLayerTestImpl[F]()
     val tls                = new TransportLayerServerTestImpl[F](currentPeerNode)
@@ -363,6 +371,7 @@ object TestNode {
 
       blockStore      <- Resources.mkBlockStoreAt[F](paths.blockStoreDir)
       blockDagStorage <- Resources.mkBlockDagStorageAt[F](paths.blockDagDir)
+      deployStorage   <- Resources.mkDeployStorageAt[F](paths.deployStorageDir)
       runtimeManager  <- createRuntime(paths.rspaceDir)
 
       node <- Resource.liftF(
@@ -383,12 +392,14 @@ object TestNode {
                    paths.blockStoreDir,
                    blockProcessingLock,
                    synchronyConstraintThreshold,
-                   maxNumberOfParents
+                   maxNumberOfParents,
+                   maxParentDepth
                  )(
                    Concurrent[F],
                    blockStore,
                    blockDagStorage,
                    lastFinalizedStorage,
+                   deployStorage,
                    metricEff,
                    spanEff,
                    casperState,
