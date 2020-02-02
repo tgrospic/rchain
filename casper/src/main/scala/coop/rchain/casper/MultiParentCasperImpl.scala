@@ -72,6 +72,15 @@ class MultiParentCasperImpl[F[_]: Sync: Concurrent: Log: Time: SafetyOracle: Las
   private[this] val AddBlockMetricsSource =
     Metrics.Source(CasperMetricsSource, "add-block")
 
+  def getGenesis(): F[BlockMessage] = genesis.pure[F]
+
+  def getValidator(): F[ByteString] =
+    validatorId match {
+      case Some(validatorIdentity) =>
+        ByteString.copyFrom(validatorIdentity.publicKey.bytes).pure[F]
+      case None => ByteString.EMPTY.pure[F]
+    }
+
   def addBlock(b: BlockMessage): F[ValidBlockProcessing] = {
 
     def logAlreadyProcessed: F[ValidBlockProcessing] =

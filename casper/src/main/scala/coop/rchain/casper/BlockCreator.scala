@@ -50,7 +50,6 @@ object BlockCreator {
   )(implicit spanF: Span[F]): F[CreateBlockStatus] =
     spanF.trace(CreateBlockMetricsSource) {
       import cats.instances.list._
-      val validator = ByteString.copyFrom(validatorIdentity.publicKey.bytes)
       for {
         tipHashes             <- Estimator[F].tips(dag, genesis)
         _                     <- spanF.mark("after-estimator")
@@ -80,34 +79,21 @@ object BlockCreator {
           )
         else List.empty[SystemDeploy]
         unsignedBlock <- if (deploys.nonEmpty || systemDeploys.nonEmpty) {
-                          SynchronyConstraintChecker[F]
-                            .check(dag, runtimeManager, genesis, validator)
-                            .ifM(
-                              LastFinalizedHeightConstraintChecker[F]
-                                .check(
-                                  dag,
-                                  genesis,
-                                  validator
-                                )
-                                .ifM(
-                                  processDeploysAndCreateBlock(
-                                    dag,
-                                    runtimeManager,
-                                    parents,
-                                    deploys,
-                                    systemDeploys,
-                                    justifications,
-                                    maxBlockNumber,
-                                    validatorIdentity.publicKey,
-                                    shardId,
-                                    version,
-                                    now,
-                                    invalidBlocks
-                                  ),
-                                  CreateBlockStatus.tooFarAheadOfLastFinalized.pure[F]
-                                ),
-                              CreateBlockStatus.notEnoughNewBlocks.pure[F]
-                            )
+
+                          processDeploysAndCreateBlock(
+                            dag,
+                            runtimeManager,
+                            parents,
+                            deploys,
+                            systemDeploys,
+                            justifications,
+                            maxBlockNumber,
+                            validatorIdentity.publicKey,
+                            shardId,
+                            version,
+                            now,
+                            invalidBlocks
+                          )
                         } else {
                           CreateBlockStatus.noNewDeploys.pure[F]
                         }
