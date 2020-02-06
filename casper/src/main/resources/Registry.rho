@@ -16,7 +16,7 @@ in {
   // We can't define it in another file like MakeMint or NonNegativeNumber because
   // that method assumes the registry already exists.
 
-  // Rholang map desiderata: speedy insert & lookup,  no conflicts on lookup, no conflicts on inserts to different keys
+  // Rholang map desiderata: speedy insert & lookup, no conflicts on lookup, no conflicts on inserts to different keys
   // This implementation: O(log n) insert & lookup; also provides O(1) lookup when it is known that the value at a key exists.
   // Conflict analysis
   //   Lookup
@@ -133,7 +133,7 @@ in {
             // Hash the key to get a 256-bit array
             keccak256Hash!(key.toByteArray(), *hashCh) |
             for (@hash <- hashCh) {
-              for(@depth <<- @(map, "depth")) {
+              for (@depth <<- @(map, "depth")) {
                 // Get the bit list
                 ByteArrayToNybbleList!(hash, 0, depth, [], *nybListCh) |
                 for (@nybList <- nybListCh) {
@@ -150,7 +150,7 @@ in {
         } |
 
         contract TreeHashMapSetter(@map, @nybList, @n, @len, @newVal, @suffix, ret) = {
-          // Look up the value of the node at [map, nybList.slice(0, n + 1)
+          // Look up the value of the node at (map, nybList.slice(0, n))
           new valCh, restCh in {
             match (map, nybList.slice(0, n)) {
               node => {
@@ -233,7 +233,7 @@ in {
         } |
 
         contract TreeHashMapContains(@map, @nybList, @n, @len, @suffix, ret) = {
-          // Look up the value of the node at [map, nybList.slice(0, n + 1)]
+          // Look up the value of the node at (map, nybList.slice(0, n))
           new valCh in {
             nodeGet!((map, nybList.slice(0, n)), *valCh) |
             for (@val <- valCh) {
@@ -268,7 +268,7 @@ in {
         } |
 
         contract TreeHashMapUpdater(@map, @nybList, @n, @len, update, @suffix, ret) = {
-          // Look up the value of the node at [map, nybList.slice(0, n + 1)
+          // Look up the value of the node at (map, nybList.slice(0, n))
           new valCh in {
             match (map, nybList.slice(0, n)) {
               node => {
@@ -311,6 +311,7 @@ in {
             }
           }
         } |
+        // Updates the value stored at the given key in the map. Returns Nil when done updating.
         contract TreeHashMap(@"update", @map, @key, update, ret) = {
           new hashCh, nybListCh, keccak256Hash(`rho:crypto:keccak256Hash`) in {
             // Hash the key to get a 256-bit array
