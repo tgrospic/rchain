@@ -40,7 +40,7 @@ in {
       for (@vaultMap <- vaultMapStore) {
         // Called from RevGenerator:
         //   RevVault!("init", *ret)
-        for (@"init", ret <- RevVault) {
+        for (@"init", ret <= RevVault) {
           ret!(*TreeHashMap, vaultMap, *initVault)
         } |
         @MakeMint!(*mintCh) |

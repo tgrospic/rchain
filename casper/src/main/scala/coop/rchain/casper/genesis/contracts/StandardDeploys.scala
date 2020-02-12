@@ -86,11 +86,15 @@ object StandardDeploys {
       1559156420651L
     )
 
-  def revGenerator(vaults: Seq[Vault], supply: Long): Signed[DeployData] =
+  def revGenerator(
+      vaults: Seq[Vault],
+      supply: Long,
+      timestamp: Long = 1565818101792L
+  ): Signed[DeployData] =
     toDeploy(
       RevGenerator(vaults, supply),
       "a06959868e39bb3a8502846686a23119716ecd001700baf9e2ecfa0dbf1a3247",
-      1565818101792L
+      timestamp
     )
 
 }

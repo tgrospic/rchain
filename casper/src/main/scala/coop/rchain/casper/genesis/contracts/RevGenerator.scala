@@ -15,24 +15,23 @@ object RevGenerator {
       userVaults.map(v => s"""("${v.revAddress.toBase58}", ${v.initialBalance})""").mkString(", ")
 
     val code: String =
-      s""" new rl(`rho:registry:lookup`), listOpsCh, revVaultCh in {
-         #   rl!(`rho:lang:listOps`, *listOpsCh) |
+      s""" new rl(`rho:registry:lookup`), revVaultCh in {
          #   rl!(`rho:rchain:revVault`, *revVaultCh) |
-         #   for (@(_, RevVault) <- revVaultCh;
-         #        @(_, ListOps)  <- listOpsCh) {
+         #   for (@(_, RevVault) <- revVaultCh) {
          #     new revVaultInitCh in {
          #       @RevVault!("init", *revVaultInitCh) |
          #       for (TreeHashMap, @vaultMap, initVault <- revVaultInitCh) {
          #         match [$vaultBalanceList] {
          #           vaults => {
-         #             new createVaultCh in {
-         #               @ListOps!("parMap", vaults, *createVaultCh, Nil) |
-         #               contract createVaultCh(@(addr, initialBalance), @createdCh) = {
-         #                 new vault in {
-         #                   initVault!(*vault, addr, initialBalance) |
-         #                   TreeHashMap!("set", vaultMap, addr, *vault, createdCh)
-         #                 }
-         #               }
+         #             new iter in {
+         #               contract iter(@[(addr, initialBalance) ... tail]) = {
+         #                  iter!(tail) |
+         #                  new vault in {
+         #                    initVault!(*vault, addr, initialBalance) |
+         #                    TreeHashMap!("set", vaultMap, addr, *vault, Nil)
+         #                  }
+         #               } |
+         #               iter!(vaults)
          #             }
          #           }
          #         }
