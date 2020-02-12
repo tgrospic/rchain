@@ -9,50 +9,40 @@ final class RevGenerator private (supply: Long, code: String)
 }
 
 object RevGenerator {
-  private def concatenate(
-      userVaults: Seq[Vault]
-  )(f: (Vault, Int) => String, separator: String = " |\n\n"): String =
-    if (userVaults.nonEmpty) userVaults.zipWithIndex.map(Function.tupled(f)).mkString(separator)
-    else "Nil"
-
-  private def vaultInitCode(userVaults: Seq[Vault]): String = {
-    def initVault(userVault: Vault, index: Int): String =
-      s"""initVault!(*x$index, "${userVault.revAddress.toBase58}", ${userVault.initialBalance})"""
-    def treeHashMapEntry(userVault: Vault, index: Int): String =
-      s"""TreeHashMap!("set", vaultMap, "${userVault.revAddress.toBase58}", *x$index, *ack$index)"""
-
-    if (userVaults.isEmpty) {
-      "Nil"
-    } else {
-      val vaultsMap: String =
-        s"""${concatenate(userVaults)(treeHashMapEntry, separator = "| \n")}"""
-
-      // Sets all vaults in the TreeHashMap and catches the acknowledgements from each set.
-      s"""
-         #new ${userVaults.indices.map(i => s"x$i, ack$i").mkString(", ")} in {
-         #  $vaultsMap |
-         #  for (${userVaults.indices.map("_ <- ack" + _).mkString("; ")}) {
-         #    ${concatenate(userVaults)(initVault)}
-         #  }
-         #}
-         #""".stripMargin('#')
-    }
-  }
 
   def apply(userVaults: Seq[Vault], supply: Long): RevGenerator = {
+    val vaultBalanceList =
+      userVaults.map(v => s"""("${v.revAddress.toBase58}", ${v.initialBalance})""").mkString(", ")
+
     val code: String =
-      s""" new rl(`rho:registry:lookup`), revVaultCh in {
+      s""" new rl(`rho:registry:lookup`), listOpsCh, revVaultCh in {
+         #   rl!(`rho:lang:listOps`, *listOpsCh) |
          #   rl!(`rho:rchain:revVault`, *revVaultCh) |
-         #   for (@(_, RevVault) <- revVaultCh) {
-         #     new ret in {
-         #       @RevVault!("init", *ret) |
-         #       for (TreeHashMap, @vaultMap, initVault <- ret) {
-         #         ${vaultInitCode(userVaults)}
+         #   for (@(_, RevVault) <- revVaultCh;
+         #        @(_, ListOps)  <- listOpsCh) {
+         #     new revVaultInitCh in {
+         #       @RevVault!("init", *revVaultInitCh) |
+         #       for (TreeHashMap, @vaultMap, initVault <- revVaultInitCh) {
+         #         match [$vaultBalanceList] {
+         #           vaults => {
+         #             new createVaultCh in {
+         #               @ListOps!("parMap", vaults, *createVaultCh, Nil) |
+         #               contract createVaultCh(@(addr, initialBalance), @createdCh) = {
+         #                 new vault in {
+         #                   initVault!(*vault, addr, initialBalance) |
+         #                   TreeHashMap!("set", vaultMap, addr, *vault, createdCh)
+         #                 }
+         #               }
+         #             }
+         #           }
+         #         }
          #       }
          #     }
          #   }
          # }
      """.stripMargin('#')
+
+//    println(s"CODE: $code")
     new RevGenerator(supply, code)
   }
 }
