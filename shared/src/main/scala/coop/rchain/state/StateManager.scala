@@ -5,7 +5,8 @@ import java.nio.file.Path
 import scala.concurrent.duration.FiniteDuration
 
 trait StateManager[F[_]] {
-  def createSync(dirPath: Path): F[Synchronizer[F]]
+  // Checks if state is empty
+  def isEmpty: F[Boolean]
 }
 
 trait Synchronizer[F[_]] {

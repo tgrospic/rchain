@@ -19,6 +19,7 @@ import coop.rchain.rspace.trace.Consume
 import coop.rchain.rspace.test._
 import coop.rchain.shared.{Log, Serialize}
 import coop.rchain.shared.PathOps._
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.atomic.AtomicAny

@@ -5,9 +5,12 @@ import cats.syntax.all._
 import cats.{Applicative, Monad}
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.BlockStore
+import coop.rchain.blockstorage.finality.LastFinalizedStorage
 import coop.rchain.casper._
+import coop.rchain.casper.syntax._
 import coop.rchain.casper.engine.EngineCell.EngineCell
 import coop.rchain.casper.protocol._
+import coop.rchain.casper.util.ProtoUtil
 import coop.rchain.casper.util.comm.CommUtil
 import coop.rchain.comm.protocol.routing.Packet
 import coop.rchain.comm.rp.Connect.{ConnectionsCell, RPConfAsk}
@@ -18,6 +21,9 @@ import coop.rchain.metrics.Metrics
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.shared.{Cell, Log, Time}
 import coop.rchain.catscontrib.Catscontrib.ToBooleanF
+import coop.rchain.models.rholang.implicits.fromGUnforgeable
+import coop.rchain.rspace.Blake2b256Hash
+import coop.rchain.rspace.state.RSpaceStateManager
 
 import scala.concurrent.duration._
 
@@ -269,9 +275,43 @@ object Running {
       ToPacket(approvedBlock.toProto)
     ) >> Log[F].info(s"ApprovedBlock sent to $peer")
 
+  final case object LastFinalizedBlockNotFoundError
+      extends RuntimeException("Last finalized block not found in the block storage.")
+
+  private def handleLastFinalizedBlockRequest[F[_]: Sync: LastFinalizedStorage: BlockStore: RPConfAsk: Log: TransportLayer](
+      peer: PeerNode,
+      casper: MultiParentCasper[F]
+  ): F[Unit] =
+    for {
+      genesis    <- casper.getGenesis
+      blockHash  <- LastFinalizedStorage[F].get(genesis)
+      maybeBlock <- BlockStore[F].get(blockHash)
+      // Exception if the block is not in the block store
+      block    <- maybeBlock.liftTo(LastFinalizedBlockNotFoundError)
+      reqProto = LastFinalizedBlock(block).toProto
+      _        <- sendToPeer(peer)(ToPacket(reqProto))
+      _        <- Log[F].info(s"Last finalized store hash sent to $peer")
+    } yield ()
+
+  private def handleStateItemsMessageRequest[F[_]: Sync: RPConfAsk: Log: TransportLayer: RSpaceStateManager](
+      peer: PeerNode,
+      startPath: Seq[(Blake2b256Hash, Option[Byte])],
+      skip: Int,
+      take: Int
+  ): F[Unit] = {
+    import coop.rchain.rspace.state.syntax._
+    for {
+      it       <- RSpaceStateManager[F].exporter.getHistory(startPath, skip, take, ByteString.copyFrom)
+      req      = StoreItemsMessage(startPath, it.items, it.lastPath)
+      reqProto = StoreItemsMessage.toProto(req)
+      _        <- streamToPeer(peer)(ToPacket(reqProto))
+      _        <- Log[F].info(s"Store items sent to $peer")
+    } yield ()
+  }
+
 }
 
-class Running[F[_]: Sync: BlockStore: CommUtil: TransportLayer: ConnectionsCell: RPConfAsk: Log: Time: Running.RequestedBlocks](
+class Running[F[_]: Sync: BlockStore: CommUtil: TransportLayer: ConnectionsCell: RPConfAsk: Log: Time: Running.RequestedBlocks: LastFinalizedStorage: RSpaceStateManager](
     casper: MultiParentCasper[F],
     approvedBlock: ApprovedBlock,
     validatorId: Option[ValidatorIdentity],
@@ -389,7 +429,15 @@ class Running[F[_]: Sync: BlockStore: CommUtil: TransportLayer: ConnectionsCell:
       handleForkChoiceTipRequest(peer, ForkChoiceTipRequest)(casper)
     case abr: ApprovedBlockRequest    => handleApprovedBlockRequest(peer, abr, approvedBlock)
     case na: NoApprovedBlockAvailable => logNoApprovedBlockAvailable(na.nodeIdentifer)
-    case _                            => noop
+
+    // Last finalized block response
+    case LastFinalizedBlockRequest => handleLastFinalizedBlockRequest(peer, casper)
+
+    // Last finalized state / response store records
+    case StoreItemsMessageRequest(startPath, skip, take) =>
+      handleStateItemsMessageRequest(peer, startPath, skip, take)
+
+    case _ => noop
   }
 
   override def withCasper[A](

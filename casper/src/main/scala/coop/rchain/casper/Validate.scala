@@ -251,6 +251,7 @@ object Validate {
                                        )
                                        .findF { blockMetadata =>
                                          for {
+                                           _ <- println(s"GET BLOCK repeatDeploy").pure[F]
                                            block <- ProtoUtil.getBlock(
                                                      blockMetadata.blockHash
                                                    )
@@ -541,6 +542,7 @@ object Validate {
     val justifiedValidators = b.justifications.map(_.validator).toSet
     val mainParentHash      = ProtoUtil.parentHashes(b).head
     for {
+      _                <- println(s"GET BLOCK justificationFollows").pure
       mainParent       <- ProtoUtil.getBlock(mainParentHash)
       bondedValidators = ProtoUtil.bonds(mainParent).map(_.validator).toSet
       status <- if (bondedValidators == justifiedValidators) {

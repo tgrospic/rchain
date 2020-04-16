@@ -1,13 +1,10 @@
 package coop.rchain.casper.util.comm
 
 import scala.concurrent.duration._
-
 import cats.effect._
-import cats.syntax.flatMap._
-import cats.syntax.functor._
+import cats.syntax.all._
 import cats.tagless.autoFunctorK
-import cats.Applicative
-
+import cats.{Applicative, Monad}
 import coop.rchain.casper._
 import coop.rchain.casper.engine._
 import coop.rchain.casper.engine.Running.RequestedBlocks
@@ -20,51 +17,43 @@ import coop.rchain.comm.transport.{Blob, TransportLayer}
 import coop.rchain.metrics.Metrics
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.shared._
-
 import com.google.protobuf.ByteString
+import coop.rchain.casper.util.comm.CommUtil.StandaloneNodeSendToBootstrapError
+import coop.rchain.rspace.Blake2b256Hash
 
+// TODO: remove CommUtil completely and create extensions (syntax) on TransportLayer
 @autoFunctorK
 trait CommUtil[F[_]] {
-  def sendBlockHash(hash: BlockHash, blockCreator: ByteString): F[Unit]
-  def sendBlockRequest(hash: BlockHash): F[Unit]
-  def sendForkChoiceTipRequest: F[Unit]
-  def sendToPeers[Msg: ToPacket](message: Msg): F[Unit] = sendToPeers(ToPacket(message))
+  // Send packet (in one piece)
   def sendToPeers(message: Packet): F[Unit]
-  def streamToPeers[Msg: ToPacket](message: Msg): F[Unit] = streamToPeers(ToPacket(message))
+
+  // Send packet in chunks (stream)
   def streamToPeers(packet: Packet): F[Unit]
-  def requestApprovedBlock: F[Unit]
+
+  // Send packet with retry
+  def sendWithRetry(
+      message: Packet,
+      peer: PeerNode,
+      retryAfter: FiniteDuration,
+      messageTypeName: String // Only for log message / should be removed with CommUtil refactor
+  ): F[Unit]
+
+  // Send request for the block to all peers
+  def sendBlockRequest(hash: BlockHash): F[Unit]
 }
 
 object CommUtil {
 
   implicit private val logSource: LogSource = LogSource(this.getClass)
 
+  // Standalone (bootstrap) node should try send messages to bootstrap node
+  final case object StandaloneNodeSendToBootstrapError extends Exception
+
   def apply[F[_]](implicit ev: CommUtil[F]): CommUtil[F] = ev
 
   def of[F[_]: Concurrent: Log: Time: Metrics: TransportLayer: ConnectionsCell: RPConfAsk: RequestedBlocks]
       : CommUtil[F] =
     new CommUtil[F] {
-
-      def sendBlockHash(hash: BlockHash, blockCreator: ByteString): F[Unit] =
-        sendToPeers(BlockHashMessageProto(hash, blockCreator)) >>
-          Log[F].info(s"Sent hash ${PrettyPrinter.buildString(hash)} to peers")
-
-      def sendBlockRequest(hash: BlockHash): F[Unit] =
-        Running
-          .RequestedBlocks[F]
-          .read
-          .flatMap(
-            requested =>
-              Applicative[F].unlessA(requested.contains(hash))(
-                Running.addNewEntry(hash) >> sendToPeers(HasBlockRequestProto(hash)) >>
-                  Log[F]
-                    .info(s"Requested missing block ${PrettyPrinter.buildString(hash)} from peers")
-              )
-          )
-
-      def sendForkChoiceTipRequest: F[Unit] =
-        sendToPeers(ForkChoiceTipRequest.toProto) >>
-          Log[F].info(s"Requested fork tip from peers")
 
       def sendToPeers(message: Packet): F[Unit] =
         for {
@@ -82,34 +71,101 @@ object CommUtil {
           _     <- TransportLayer[F].stream(peers, msg)
         } yield ()
 
-      def requestApprovedBlock: F[Unit] = {
-
-        def keepOnRequestingTillRunning(bootstrap: PeerNode, msg: Protocol): F[Unit] =
-          TransportLayer[F].send(bootstrap, msg) >>= {
+      def sendWithRetry(
+          message: Packet,
+          peer: PeerNode,
+          retryAfter: FiniteDuration,
+          msgTypeName: String
+      ): F[Unit] = {
+        def keepOnRequestingTillRunning(peer: PeerNode, msg: Protocol): F[Unit] =
+          TransportLayer[F].send(peer, msg) >>= {
             case Right(_) =>
-              Log[F].info(s"Successfully sent ApprovedBlockRequest to $bootstrap")
+              Log[F].info(s"Successfully sent ${msgTypeName} to $peer")
             case Left(error) =>
               Log[F].warn(
-                s"Failed to send ApprovedBlockRequest to $bootstrap because of ${CommError.errorMessage(error)}. Retrying in 10 seconds..."
-              ) >> Time[F].sleep(10 seconds) >> keepOnRequestingTillRunning(bootstrap, msg)
+                s"Failed to send ${msgTypeName} to $peer because of ${CommError
+                  .errorMessage(error)}. Retrying in $retryAfter..."
+              ) >> Time[F].sleep(retryAfter) >> keepOnRequestingTillRunning(peer, msg)
           }
 
         RPConfAsk[F].ask >>= { conf =>
-          conf.bootstrap match {
-            case Some(bootstrap) =>
-              val msg =
-                packet(
-                  conf.local,
-                  conf.networkId,
-                  ApprovedBlockRequest("PleaseSendMeAnApprovedBlock").toProto
-                )
-              Log[F].info("Starting to request ApprovedBlockRequest") >>
-                Concurrent[F].start(keepOnRequestingTillRunning(bootstrap, msg)).void
-            case None =>
-              Log[F].warn("Cannot request for an approved block as standalone") // TODO we should exit here
-          }
+          val msg = packet(conf.local, conf.networkId, message)
+          Log[F].info(s"Starting to request ${msg.getClass.getName}") >>
+            Concurrent[F].start(keepOnRequestingTillRunning(peer, msg)).void
         }
       }
+
+      def sendBlockRequest(hash: BlockHash): F[Unit] =
+        Running
+          .RequestedBlocks[F]
+          .read
+          .flatMap(
+            requested =>
+              Applicative[F].unlessA(requested.contains(hash))(
+                Running.addNewEntry(hash) >> sendToPeers(ToPacket(HasBlockRequestProto(hash))) >>
+                  Log[F]
+                    .info(s"Requested missing block ${PrettyPrinter.buildString(hash)} from peers")
+              )
+          )
+
     }
+}
+
+trait CommUtilSyntax {
+  implicit final def casperSyntaxCommUtil[F[_]](commUtil: CommUtil[F]): CommUtilOps[F] =
+    new CommUtilOps[F](commUtil)
+}
+
+final class CommUtilOps[F[_]](
+    // CommUtil extensions / syntax
+    private val commUtil: CommUtil[F]
+) {
+  def sendToPeers[Msg: ToPacket](message: Msg): F[Unit] =
+    commUtil.sendToPeers(ToPacket(message))
+
+  def streamToPeers[Msg: ToPacket](message: Msg): F[Unit] =
+    commUtil.streamToPeers(ToPacket(message))
+
+  def sendBlockHash(
+      hash: BlockHash,
+      blockCreator: ByteString
+  )(implicit m: Monad[F], log: Log[F]): F[Unit] =
+    this.sendToPeers(BlockHashMessageProto(hash, blockCreator)) >>
+      Log[F].info(s"Sent hash ${PrettyPrinter.buildString(hash)} to peers")
+
+  def sendForkChoiceTipRequest(implicit m: Monad[F], log: Log[F]): F[Unit] =
+    this.sendToPeers(ForkChoiceTipRequest.toProto) >>
+      Log[F].info(s"Requested fork tip from peers")
+
+  def sendStoreItemsRequest(
+      req: StoreItemsMessageRequest
+  )(implicit m: Monad[F], log: Log[F]): F[Unit] =
+    this.sendToPeers(StoreItemsMessageRequest.toProto(req)) >>
+      Log[F].info(s"Requested store page for last finalized state")
+
+  def sendStoreItemsRequest(
+      rootStateHash: Blake2b256Hash,
+      pageSize: Int
+  )(implicit m: Monad[F], log: Log[F]): F[Unit] = {
+    val rootPath = Seq((rootStateHash, none[Byte]))
+    val req      = StoreItemsMessageRequest(rootPath, 0, pageSize)
+    this.sendStoreItemsRequest(req)
+  }
+
+  def requestApprovedBlock(implicit m: Sync[F], r: RPConfAsk[F]): F[Unit] =
+    for {
+      maybeBootstrap <- RPConfAsk[F].reader(_.bootstrap)
+      bootstrap      <- maybeBootstrap.liftTo(StandaloneNodeSendToBootstrapError)
+      msg            = ApprovedBlockRequest("PleaseSendMeAnApprovedBlock").toProto
+      _              <- commUtil.sendWithRetry(ToPacket(msg), bootstrap, 10.seconds, "ApprovedBlockRequest")
+    } yield ()
+
+  def requestLastFinalizedBlock(implicit m: Sync[F], r: RPConfAsk[F]): F[Unit] =
+    for {
+      maybeBootstrap <- RPConfAsk[F].reader(_.bootstrap)
+      bootstrap      <- maybeBootstrap.liftTo(StandaloneNodeSendToBootstrapError)
+      msg            = LastFinalizedBlockRequest.toProto
+      _              <- commUtil.sendWithRetry(ToPacket(msg), bootstrap, 10.seconds, "LastFinalizedBlockRequest")
+    } yield ()
 
 }

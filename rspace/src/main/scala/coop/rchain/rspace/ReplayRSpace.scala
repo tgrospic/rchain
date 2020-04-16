@@ -18,6 +18,7 @@ import coop.rchain.shared.{Log, Serialize}
 import coop.rchain.shared.SyncVarOps._
 import com.google.common.collect.Multiset
 import com.typesafe.scalalogging.Logger
+import coop.rchain.store.KeyValueStoreManager
 import monix.execution.atomic.AtomicAny
 
 class ReplayRSpace[F[_]: Sync, C, P, A, K](

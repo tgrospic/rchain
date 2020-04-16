@@ -18,6 +18,7 @@ import coop.rchain.rspace.trace._
 import coop.rchain.shared.{Cell, Log, Serialize}
 import coop.rchain.shared.SyncVarOps._
 import com.typesafe.scalalogging.Logger
+import coop.rchain.store.KeyValueStoreManager
 import monix.execution.atomic.AtomicAny
 import scodec.Codec
 

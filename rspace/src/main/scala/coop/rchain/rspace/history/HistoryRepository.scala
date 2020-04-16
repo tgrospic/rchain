@@ -3,9 +3,10 @@ package coop.rchain.rspace.history
 import cats.implicits._
 import cats.effect.Concurrent
 import cats.Parallel
-import coop.rchain.rspace.state.RSpaceExporter
-import coop.rchain.rspace.state.instances.RSpaceExporterImpl
+import coop.rchain.rspace.state.{RSpaceExporter, RSpaceImporter}
+import coop.rchain.rspace.state.instances.{RSpaceExporterImpl, RSpaceImporterImpl}
 import coop.rchain.rspace.{Blake2b256Hash, HistoryReader, HotStoreAction}
+import coop.rchain.store.KeyValueStoreManager
 import org.lmdbjava.EnvFlags
 import scodec.Codec
 
@@ -19,6 +20,8 @@ trait HistoryRepository[F[_], C, P, A, K] extends HistoryReader[F, C, P, A, K] {
   def close(): F[Unit]
 
   def exporter: F[RSpaceExporter[F]]
+
+  def importer: F[RSpaceImporter[F]]
 }
 
 final case class LMDBStorageConfig(
@@ -57,7 +60,14 @@ object HistoryRepositoryInstances {
       historyLMDBStore <- StoreInstances.lmdbStore[F](config.historyStore)
       historyStore     = HistoryStoreInstances.historyStore[F](historyLMDBStore)
       history          = HistoryInstances.merging(currentRoot, historyStore)
-      // RSpace exporter / directly operates on Store (lmdb)
+      // RSpace importer/exporter / directly operates on Store (lmdb)
       exporter = RSpaceExporterImpl[F](historyLMDBStore, coldLMDBStore, rootsLMDBStore)
-    } yield HistoryRepositoryImpl[F, C, P, A, K](history, rootsRepository, coldStore, exporter)
+      importer = RSpaceImporterImpl[F](historyLMDBStore, coldLMDBStore, rootsLMDBStore)
+    } yield HistoryRepositoryImpl[F, C, P, A, K](
+      history,
+      rootsRepository,
+      coldStore,
+      exporter,
+      importer
+    )
 }

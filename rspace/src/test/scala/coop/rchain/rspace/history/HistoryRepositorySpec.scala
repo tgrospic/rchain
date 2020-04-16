@@ -29,7 +29,7 @@ import scala.collection.concurrent.TrieMap
 import scala.util.Random
 import cats.implicits._
 import com.google.protobuf.ByteString
-import coop.rchain.rspace.state.RSpaceExporter
+import coop.rchain.rspace.state.{RSpaceExporter, RSpaceImporter}
 import coop.rchain.state.{TrieExporter, TrieNode}
 import scodec.Codec
 
@@ -176,7 +176,8 @@ class HistoryRepositorySpec
         emptyHistory,
         pastRoots,
         inMemColdStore,
-        emptyExporter
+        emptyExporter,
+        emptyImporter
       )
       _ <- f(repo)
     } yield ()).runSyncUnsafe(20.seconds)
@@ -253,5 +254,17 @@ trait InMemoryHistoryRepositoryTestBase extends InMemoryHistoryTestBase {
         keys: Seq[Blake2b256Hash],
         fromBuffer: ByteBuffer => Value
     ): F[Seq[(Blake2b256Hash, Value)]] = ???
+  }
+
+  def emptyImporter[F[_]: Sync]: RSpaceImporter[F] = new RSpaceImporter[F] {
+    override def setHistoryItems[Value](
+        data: Seq[(Blake2b256Hash, Value)],
+        toBuffer: Value => ByteBuffer
+    ): F[Unit] = ???
+
+    override def setDataItems[Value](
+        data: Seq[(Blake2b256Hash, Value)],
+        toBuffer: Value => ByteBuffer
+    ): F[Unit] = ???
   }
 }

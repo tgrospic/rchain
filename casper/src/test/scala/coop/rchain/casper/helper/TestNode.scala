@@ -10,10 +10,9 @@ import cats.effect.{Concurrent, Resource, Sync}
 import cats.implicits._
 import coop.rchain.blockstorage._
 import coop.rchain.blockstorage.dag.{BlockDagFileStorage, BlockDagStorage}
-import coop.rchain.blockstorage.deploy.{DeployStorage, InMemDeployStorage, LMDBDeployStorage}
+import coop.rchain.blockstorage.deploy.DeployStorage
 import coop.rchain.blockstorage.finality.{LastFinalizedFileStorage, LastFinalizedStorage}
 import coop.rchain.casper.CasperState.CasperStateCell
-import coop.rchain.casper.MultiParentCasper.ignoreDoppelgangerCheck
 import coop.rchain.casper._
 import coop.rchain.casper.api.{BlockAPI, GraphConfig, GraphzGenerator}
 import coop.rchain.casper.engine.EngineCell._
@@ -37,6 +36,7 @@ import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.p2p.EffectsTestInstances._
 import coop.rchain.rholang.interpreter.Runtime.RhoHistoryRepository
+import coop.rchain.rspace.state.instances.RSpaceStateManagerDummyImpl
 import coop.rchain.shared._
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -122,6 +122,8 @@ class TestNode[F[_]](
     finalizationRate,
     blockProcessingLock
   )
+
+  implicit val rspaceMan = RSpaceStateManagerDummyImpl()
 
   val engine                             = new Running(casperEff, approvedBlock, validatorId, ().pure[F])
   implicit val engineCell: EngineCell[F] = Cell.unsafe[F, Engine[F]](engine)

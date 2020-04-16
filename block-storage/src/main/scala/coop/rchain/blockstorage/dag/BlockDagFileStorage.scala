@@ -331,7 +331,8 @@ final class BlockDagFileStorage[F[_]: Concurrent: Sync: Log: RaiseIOError] priva
                 _            <- putBlockNumber(block.blockHash, blockNumber(block))
                 _            <- deployIndex.addAll(deployHashes.map(_ -> block.blockHash))
                 _            <- latestMessagesIndex.addAll(newValidatorsWithSenderLatestMessages.toList)
-                _            <- blockMetadataIndex.add(blockMetadata)
+                isGenesis    = block.blockHash == genesis.blockHash
+                _            <- blockMetadataIndex.add(blockMetadata, isGenesis)
               } yield ()
             }
         dag <- representation

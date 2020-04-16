@@ -13,6 +13,7 @@ import coop.rchain.rspace.{RSpace, ReplayRSpace}
 import coop.rchain.shared.Language.ignore
 import coop.rchain.shared.{Log, Serialize}
 import coop.rchain.rspace.util._
+import coop.rchain.store.InMemoryStoreManager
 
 import scala.concurrent.ExecutionContext
 import scodec.bits.ByteVector

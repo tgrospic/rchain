@@ -3,6 +3,7 @@ package coop.rchain.rspace.state.instances
 import java.nio.ByteBuffer
 
 import cats.effect.Concurrent
+import cats.syntax.all._
 import coop.rchain.rspace.Blake2b256Hash
 import coop.rchain.rspace.history.Store
 import coop.rchain.rspace.state.RSpaceImporter
@@ -22,13 +23,14 @@ object RSpaceImporterImpl {
       sourceRootsStore: Store[F]
   ) extends RSpaceImporter[F] {
     override def setHistoryItems[Value](
-        keys: Seq[(Blake2b256Hash, Value)],
+        data: Seq[(Blake2b256Hash, Value)],
         toBuffer: Value => ByteBuffer
-    ): F[RSpaceImporter.ImportResult] = ???
+    ): F[Unit] =
+      sourceHistoryStore.put(data, toBuffer)
 
     override def setDataItems[Value](
-        keys: Seq[(Blake2b256Hash, Value)],
+        data: Seq[(Blake2b256Hash, Value)],
         toBuffer: Value => ByteBuffer
-    ): F[RSpaceImporter.ImportResult] = ???
+    ): F[Unit] = ???
   }
 }

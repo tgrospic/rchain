@@ -25,6 +25,7 @@ import coop.rchain.rholang.interpreter.storage.ChargingRSpace
 import coop.rchain.rspace.history.HistoryRepository
 import coop.rchain.rspace.{Match, RSpace, _}
 import coop.rchain.shared.Log
+import coop.rchain.store.KeyValueStoreManager
 
 import scala.concurrent.ExecutionContext
 

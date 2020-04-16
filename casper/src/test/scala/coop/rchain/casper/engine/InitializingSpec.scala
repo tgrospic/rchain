@@ -9,6 +9,7 @@ import coop.rchain.catscontrib.TaskContrib._
 import coop.rchain.comm.rp.ProtocolHelper._
 import coop.rchain.crypto.hash.Blake2b256
 import coop.rchain.crypto.signatures.Secp256k1
+import coop.rchain.rspace.state.instances.RSpaceStateManagerDummyImpl
 import coop.rchain.shared.{Cell, EventPublisher}
 import monix.eval.Task
 import org.scalatest.WordSpec
@@ -25,6 +26,8 @@ class InitializingSpec extends WordSpec {
       val theInit = Task.unit
 
       implicit val engineCell = Cell.unsafe[Task, Engine[Task]](Engine.noop)
+
+      implicit val rspaceMan = RSpaceStateManagerDummyImpl[Task]()
 
       // interval and duration don't really matter since we don't require and signs from validators
       val initializingEngine =

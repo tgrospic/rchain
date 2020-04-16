@@ -11,6 +11,7 @@ import coop.rchain.comm.rp.ProtocolHelper._
 import coop.rchain.comm.transport
 import coop.rchain.crypto.hash.Blake2b256
 import coop.rchain.crypto.signatures.Secp256k1
+import coop.rchain.rspace.state.instances.RSpaceStateManagerDummyImpl
 import monix.eval.Task
 import org.scalatest.WordSpec
 
@@ -37,6 +38,8 @@ class RunningSpec extends WordSpec {
     )
 
     implicit val casper = NoOpsCasperEffect[Task]().unsafeRunSync
+
+    implicit val rspaceMan = RSpaceStateManagerDummyImpl[Task]()
 
     val engine = new Running[Task](casper, approvedBlock, None, Task.unit)
 

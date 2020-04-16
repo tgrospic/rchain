@@ -23,7 +23,7 @@ import scodec.Codec
 import monix.execution.Scheduler.Implicits.global
 import cats.implicits._
 import coop.rchain.rspace.internal.{Datum, WaitingContinuation}
-import coop.rchain.rspace.state.instances.RSpaceExporterImpl
+import coop.rchain.rspace.state.instances.{RSpaceExporterImpl, RSpaceImporterImpl}
 import org.lmdbjava.EnvFlags
 import coop.rchain.shared.PathOps._
 import coop.rchain.shared.Serialize
@@ -56,12 +56,14 @@ class LMDBHistoryRepositoryGenerativeSpec
       rootRepository   = new RootRepository[Task](rootsStore)
       emptyHistory     = HistoryInstances.merging(History.emptyRootHash, historyStore)
       exporter         = RSpaceExporterImpl[Task](historyLmdbStore, coldLmdbStore, rootsLmdbStore)
+      importer         = RSpaceImporterImpl[Task](historyLmdbStore, coldLmdbStore, rootsLmdbStore)
       repository: HistoryRepository[Task, String, Pattern, String, StringsCaptor] = HistoryRepositoryImpl
         .apply[Task, String, Pattern, String, StringsCaptor](
           emptyHistory,
           rootRepository,
           coldStore,
-          exporter
+          exporter,
+          importer
         )
     } yield repository
 
@@ -81,7 +83,8 @@ class InmemHistoryRepositoryGenerativeSpec
         emptyHistory,
         rootRepository,
         inMemColdStore,
-        emptyExporter
+        emptyExporter,
+        emptyImporter
       )
     repository.pure[Task]
   }

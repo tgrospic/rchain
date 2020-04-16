@@ -22,6 +22,7 @@ import com.google.protobuf.ByteString
 import coop.rchain.casper.protocol.ProcessedSystemDeploy.Failed
 import coop.rchain.casper.util.rholang.SystemDeployPlayResult.{PlayFailed, PlaySucceeded}
 import coop.rchain.crypto.signatures.Signed
+import coop.rchain.rspace.Blake2b256Hash
 import monix.eval.Coeval
 
 object InterpreterUtil {
@@ -54,10 +55,11 @@ object InterpreterUtil {
   ): F[BlockProcessing[Option[StateHash]]] = {
     val incomingPreStateHash = ProtoUtil.preStateHash(block)
     for {
-      _                  <- Span[F].mark("before-unsafe-get-parents")
-      parents            <- ProtoUtil.getParents(block)
-      _                  <- Span[F].mark("before-compute-parents-post-state")
-      preStateHashEither <- computeParentsPostState(parents, dag, runtimeManager).attempt
+      _ <- Span[F].mark("before-unsafe-get-parents")
+//      parents <- ProtoUtil.getParents(block)
+      _ <- Span[F].mark("before-compute-parents-post-state")
+//      preStateHashEither <- computeParentsPostState(parents, dag, runtimeManager).attempt
+      preStateHashEither = block.body.state.preStateHash.asRight[Throwable]
       _                  <- Log[F].info(s"Computed parents post state for ${PrettyPrinter.buildString(block)}.")
       result <- preStateHashEither match {
                  case Left(ex) =>

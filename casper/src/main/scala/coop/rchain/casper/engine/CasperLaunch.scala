@@ -11,7 +11,9 @@ import coop.rchain.blockstorage.finality.LastFinalizedStorage
 import coop.rchain.blockstorage.util.io.IOError.RaiseIOError
 import coop.rchain.casper.LastApprovedBlock.LastApprovedBlock
 import coop.rchain.casper._
+import coop.rchain.casper.syntax._
 import coop.rchain.casper.engine.EngineCell._
+import coop.rchain.casper.engine.Running.RequestedBlocks
 import coop.rchain.casper.protocol._
 import coop.rchain.casper.util.comm._
 import coop.rchain.casper.util.rholang.RuntimeManager
@@ -19,6 +21,7 @@ import coop.rchain.casper.util.{BondsParser, VaultParser}
 import coop.rchain.comm.rp.Connect.{ConnectionsCell, RPConfAsk}
 import coop.rchain.comm.transport.TransportLayer
 import coop.rchain.metrics.{Metrics, Span}
+import coop.rchain.rspace.state.RSpaceStateManager
 import coop.rchain.shared._
 
 trait CasperLaunch[F[_]] {
@@ -27,7 +30,7 @@ trait CasperLaunch[F[_]] {
 
 object CasperLaunch {
 
-  def of[F[_]: LastApprovedBlock: Metrics: Span: BlockStore: CommUtil: ConnectionsCell: TransportLayer: RPConfAsk: SafetyOracle: LastFinalizedBlockCalculator: Concurrent: Time: Log: EventLog: BlockDagStorage: LastFinalizedStorage: EngineCell: EnvVars: RaiseIOError: RuntimeManager: Running.RequestedBlocks: EventPublisher: SynchronyConstraintChecker: LastFinalizedHeightConstraintChecker: Estimator: DeployStorage](
+  def of[F[_]: LastApprovedBlock: Metrics: Span: BlockStore: CommUtil: ConnectionsCell: TransportLayer: RPConfAsk: SafetyOracle: LastFinalizedBlockCalculator: Concurrent: Time: Log: EventLog: BlockDagStorage: LastFinalizedStorage: EngineCell: EnvVars: RaiseIOError: RuntimeManager: RequestedBlocks: EventPublisher: SynchronyConstraintChecker: LastFinalizedHeightConstraintChecker: Estimator: DeployStorage: RSpaceStateManager](
       conf: CasperConf
   ): CasperLaunch[F] = new CasperLaunch[F] {
 
@@ -148,8 +151,10 @@ object CasperLaunch {
               conf.shardName,
               conf.finalizationRate,
               validatorId,
-              CommUtil[F].requestApprovedBlock
+//              CommUtil[F].requestApprovedBlock
+              CommUtil[F].requestLastFinalizedBlock
             )
       } yield ()
+
   }
 }

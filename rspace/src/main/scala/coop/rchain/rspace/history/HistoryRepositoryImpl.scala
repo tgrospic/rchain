@@ -8,7 +8,7 @@ import cats.{Applicative, Parallel}
 import com.typesafe.scalalogging.Logger
 import coop.rchain.rspace.history.HistoryRepositoryImpl._
 import coop.rchain.rspace.internal._
-import coop.rchain.rspace.state.RSpaceExporter
+import coop.rchain.rspace.state.{RSpaceExporter, RSpaceImporter}
 import coop.rchain.rspace.{
   internal,
   util,
@@ -30,7 +30,8 @@ final case class HistoryRepositoryImpl[F[_]: Sync: Parallel, C, P, A, K](
     history: History[F],
     rootsRepository: RootRepository[F],
     leafStore: ColdStore[F],
-    rspaceExporter: RSpaceExporter[F]
+    rspaceExporter: RSpaceExporter[F],
+    rspaceImporter: RSpaceImporter[F]
 )(implicit codecC: Codec[C], codecP: Codec[P], codecA: Codec[A], codecK: Codec[K])
     extends HistoryRepository[F, C, P, A, K] {
   val joinSuffixBits                = BitVector("-joins".getBytes(StandardCharsets.UTF_8))
@@ -222,7 +223,9 @@ final case class HistoryRepositoryImpl[F[_]: Sync: Parallel, C, P, A, K](
       _ <- history.close()
     } yield ()
 
-  override def exporter: F[RSpaceExporter[F]] = rspaceExporter.pure
+  override def exporter: F[RSpaceExporter[F]] = Sync[F].delay(rspaceExporter)
+
+  override def importer: F[RSpaceImporter[F]] = Sync[F].delay(rspaceImporter)
 }
 
 object HistoryRepositoryImpl {
