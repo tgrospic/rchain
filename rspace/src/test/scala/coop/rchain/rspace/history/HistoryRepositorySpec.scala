@@ -266,5 +266,7 @@ trait InMemoryHistoryRepositoryTestBase extends InMemoryHistoryTestBase {
         data: Seq[(Blake2b256Hash, Value)],
         toBuffer: Value => ByteBuffer
     ): F[Unit] = ???
+
+    override def setRoot(key: Blake2b256Hash): F[Unit] = ???
   }
 }

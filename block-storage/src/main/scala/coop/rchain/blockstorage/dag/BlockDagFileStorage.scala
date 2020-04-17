@@ -5,8 +5,8 @@ import java.nio.file.Path
 import cats.Monad
 import cats.effect.concurrent.Semaphore
 import cats.effect.{Concurrent, Sync}
-import cats.implicits._
 import cats.mtl.MonadState
+import cats.syntax.all._
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage._
 import coop.rchain.blockstorage.dag.BlockDagFileStorage.{Checkpoint, CheckpointedDagInfo}
@@ -82,6 +82,8 @@ final class BlockDagFileStorage[F[_]: Concurrent: Sync: Log: RaiseIOError] priva
       invalidBlocksSet: Set[BlockMetadata],
       sortOffset: Long
   ) extends BlockDagRepresentation[F] {
+    import cats.instances.list._
+
     private def findAndAccessCheckpoint[R](
         blockHash: BlockHash,
         loadFromCheckpoint: CheckpointedDagInfo => Option[R]
@@ -257,7 +259,7 @@ final class BlockDagFileStorage[F[_]: Concurrent: Sync: Log: RaiseIOError] priva
                  case None =>
                    Log[F].warn(
                      s"Requested a block with block number $offset, but there is no checkpoint for it"
-                   ) >> None.pure[F]
+                   ) >> none[CheckpointedDagInfo].pure[F]
                  case Some((checkpoint, i)) =>
                    loadCheckpointDagInfo(checkpoint, i).map(Option(_))
                }
@@ -285,6 +287,16 @@ final class BlockDagFileStorage[F[_]: Concurrent: Sync: Log: RaiseIOError] priva
   def getRepresentation: F[BlockDagRepresentation[F]] =
     lock.withPermit(representation)
 
+  final case object ApprovedBlockNotAvailableFatalError extends Exception
+
+  private def initializeTopoSort(isGenesis: Boolean, genesisBlockNum: Long) =
+    for {
+      // Check if topological sort and checkpoints are empty
+      dag <- getRepresentation
+
+      // Create topological list and checkpoint
+    } yield ()
+
   def insert(
       block: BlockMessage,
       genesis: BlockMessage,
@@ -298,7 +310,18 @@ final class BlockDagFileStorage[F[_]: Concurrent: Sync: Log: RaiseIOError] priva
             } else {
               val blockMetadata = BlockMetadata.fromBlock(block, invalid)
               assert(block.blockHash.size == BlockHash.Length)
+              val isGenesis = block.blockHash == genesis.blockHash
               for {
+                // Initialize DAG checkpoint if adding ApprovedBlock from last finalized state
+                // - this means genesis block with block number > 0
+//                _ <- initializeTopoSort(isGenesis, genesis.body.state.blockNumber)
+                _                   <- println(s"GET APPROVED BLOCK").pure[F]
+                approvedBlockNumber = genesis.body.state.blockNumber
+
+                //                offset = Math.max(approvedBlockNumber - 100, 0)
+                offset = approvedBlockNumber
+                _      = println(s"APPROVED BLOCK number: ${approvedBlockNumber}, offset: ${offset}")
+
                 _ <- if (invalid) invalidBlocksIndex.add(blockMetadata, ()) else ().pure[F]
                 //Block which contains newly bonded validators will not
                 //have those validators in its justification
@@ -331,8 +354,7 @@ final class BlockDagFileStorage[F[_]: Concurrent: Sync: Log: RaiseIOError] priva
                 _            <- putBlockNumber(block.blockHash, blockNumber(block))
                 _            <- deployIndex.addAll(deployHashes.map(_ -> block.blockHash))
                 _            <- latestMessagesIndex.addAll(newValidatorsWithSenderLatestMessages.toList)
-                isGenesis    = block.blockHash == genesis.blockHash
-                _            <- blockMetadataIndex.add(blockMetadata, isGenesis)
+                _            <- blockMetadataIndex.add(blockMetadata, offset)
               } yield ()
             }
         dag <- representation
@@ -404,7 +426,8 @@ object BlockDagFileStorage {
 
   private def loadCheckpoints[F[_]: Sync: Log: RaiseIOError](
       checkpointsDirPath: Path
-  ): F[List[Checkpoint]] =
+  ): F[List[Checkpoint]] = {
+    import cats.instances.list._
     for {
       _     <- makeDirectory[F](checkpointsDirPath)
       files <- listRegularFiles[F](checkpointsDirPath)
@@ -425,12 +448,17 @@ object BlockDagFileStorage {
                      }) {
                    sortedCheckpoints.pure[F]
                  } else {
-                   Sync[F].raiseError(CheckpointsAreNotConsecutive(sortedCheckpoints.map(_.path)))
+                   Sync[F].raiseError[List[Checkpoint]](
+                     CheckpointsAreNotConsecutive(sortedCheckpoints.map(_.path))
+                   )
                  }
                } else {
-                 Sync[F].raiseError(CheckpointsDoNotStartFromZero(sortedCheckpoints.map(_.path)))
+                 Sync[F].raiseError[List[Checkpoint]](
+                   CheckpointsDoNotStartFromZero(sortedCheckpoints.map(_.path))
+                 )
                }
     } yield result
+  }
 
   private def loadBlockNumberIndexLmdbStore[F[_]: Sync: Log: RaiseIOError](
       config: Config

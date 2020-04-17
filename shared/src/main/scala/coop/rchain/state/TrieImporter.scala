@@ -17,4 +17,7 @@ trait TrieImporter[F[_]] {
       data: Seq[(KeyHash, Value)],
       toBuffer: Value => ByteBuffer
   ): F[Unit]
+
+  // Set current root hash
+  def setRoot(key: KeyHash): F[Unit]
 }

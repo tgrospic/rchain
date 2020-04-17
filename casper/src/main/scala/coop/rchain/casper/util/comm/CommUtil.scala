@@ -14,20 +14,19 @@ import coop.rchain.comm.protocol.routing.{Packet, Protocol}
 import coop.rchain.comm.rp.Connect.{ConnectionsCell, RPConfAsk}
 import coop.rchain.comm.rp.ProtocolHelper.packet
 import coop.rchain.comm.transport.{Blob, TransportLayer}
-import coop.rchain.metrics.Metrics
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.shared._
 import com.google.protobuf.ByteString
 import coop.rchain.casper.util.comm.CommUtil.StandaloneNodeSendToBootstrapError
 import coop.rchain.rspace.Blake2b256Hash
 
-// TODO: remove CommUtil completely and create extensions (syntax) on TransportLayer
+// TODO: remove CommUtil completely and move to extensions (syntax) on TransportLayer
 @autoFunctorK
 trait CommUtil[F[_]] {
-  // Send packet (in one piece)
+  // Broadcast packet (in one piece)
   def sendToPeers(message: Packet): F[Unit]
 
-  // Send packet in chunks (stream)
+  // Broadcast packet in chunks (stream)
   def streamToPeers(packet: Packet): F[Unit]
 
   // Send packet with retry
@@ -51,7 +50,7 @@ object CommUtil {
 
   def apply[F[_]](implicit ev: CommUtil[F]): CommUtil[F] = ev
 
-  def of[F[_]: Concurrent: Log: Time: Metrics: TransportLayer: ConnectionsCell: RPConfAsk: RequestedBlocks]
+  def of[F[_]: Concurrent: TransportLayer: RPConfAsk: ConnectionsCell: RequestedBlocks: Log: Time]
       : CommUtil[F] =
     new CommUtil[F] {
 
@@ -96,6 +95,7 @@ object CommUtil {
       }
 
       def sendBlockRequest(hash: BlockHash): F[Unit] =
+        // TODO: Running is depending on CommUtil, it should't be used here
         Running
           .RequestedBlocks[F]
           .read
@@ -130,17 +130,17 @@ final class CommUtilOps[F[_]](
       hash: BlockHash,
       blockCreator: ByteString
   )(implicit m: Monad[F], log: Log[F]): F[Unit] =
-    this.sendToPeers(BlockHashMessageProto(hash, blockCreator)) >>
+    sendToPeers(BlockHashMessageProto(hash, blockCreator)) >>
       Log[F].info(s"Sent hash ${PrettyPrinter.buildString(hash)} to peers")
 
   def sendForkChoiceTipRequest(implicit m: Monad[F], log: Log[F]): F[Unit] =
-    this.sendToPeers(ForkChoiceTipRequest.toProto) >>
+    sendToPeers(ForkChoiceTipRequest.toProto) >>
       Log[F].info(s"Requested fork tip from peers")
 
   def sendStoreItemsRequest(
       req: StoreItemsMessageRequest
   )(implicit m: Monad[F], log: Log[F]): F[Unit] =
-    this.sendToPeers(StoreItemsMessageRequest.toProto(req)) >>
+    sendToPeers(StoreItemsMessageRequest.toProto(req)) >>
       Log[F].info(s"Requested store page for last finalized state")
 
   def sendStoreItemsRequest(
@@ -149,7 +149,7 @@ final class CommUtilOps[F[_]](
   )(implicit m: Monad[F], log: Log[F]): F[Unit] = {
     val rootPath = Seq((rootStateHash, none[Byte]))
     val req      = StoreItemsMessageRequest(rootPath, 0, pageSize)
-    this.sendStoreItemsRequest(req)
+    sendStoreItemsRequest(req)
   }
 
   def requestApprovedBlock(implicit m: Sync[F], r: RPConfAsk[F]): F[Unit] =

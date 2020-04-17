@@ -107,12 +107,16 @@ object InterpreterUtil {
           .toMap
         _         <- Span[F].mark("before-process-pre-state-hash")
         blockData = BlockData.fromBlock(block)
+        _ = println(
+          s"replayBlock BEFORE replayComputeState initialStateHash: ${Base16.encode(initialStateHash.toByteArray)}"
+        )
+        isInitialGenesis = block.header.parentsHashList.isEmpty
         replayResult <- runtimeManager.replayComputeState(initialStateHash)(
                          internalDeploys,
                          internalSystemDeploys,
                          blockData,
                          invalidBlocks,
-                         isGenesis
+                         isInitialGenesis
                        )
       } yield replayResult
     }

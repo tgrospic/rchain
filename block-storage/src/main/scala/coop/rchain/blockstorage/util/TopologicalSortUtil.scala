@@ -1,5 +1,6 @@
 package coop.rchain.blockstorage.util
 
+import coop.rchain.crypto.codec.Base16
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.models.BlockMetadata
 
@@ -11,6 +12,13 @@ object TopologicalSortUtil {
 
     assert(offsetDiff <= Int.MaxValue)
     val number = offsetDiff.toInt
+
+    println(
+      s"TopologicalSortUtil.update sortSize: ${sort.size}, offset: $offset, block: ${block.blockNum}, offsetDiff: $offsetDiff"
+    )
+    println(
+      s"  block hash: ${Base16.encode(block.blockHash.toByteArray).take(6)}"
+    )
 
     //block numbers must be sequential, so a new block can only be
     //at a known height or 1 greater than a known height

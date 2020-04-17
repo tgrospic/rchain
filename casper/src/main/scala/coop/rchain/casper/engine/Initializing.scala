@@ -79,6 +79,7 @@ class Initializing[F[_]: Sync: Metrics: Span: Concurrent: BlockStore: CommUtil: 
   }
 
   private def onLastFinalizedBlock(sender: PeerNode, block: BlockMessage): F[Unit] = {
+    import cats.instances.list._
     val senderIsBootstrap = RPConfAsk[F].ask.map(_.bootstrap.exists(_ == sender))
     for {
       _ <- Log[F].info(
@@ -99,13 +100,14 @@ class Initializing[F[_]: Sync: Metrics: Span: Concurrent: BlockStore: CommUtil: 
                     )
                   )
               // TODO: request signed last finalized block as approved block
+              // Add last finalized block as ApprovedBlock
               approvedBlock = ApprovedBlock(ApprovedBlockCandidate(block, 0), Nil)
               _             <- insertIntoBlockAndDagStore[F](genesis, approvedBlock)
               _             <- LastApprovedBlock[F].set(approvedBlock)
               // Transition to restore last finalized state
               preStateHash = Blake2b256Hash.fromByteString(ProtoUtil.preStateHash(block))
+              // Transition to restore last finalized state
               _ <- transitionToLastFinalizedState(
-                    Blake2b256Hash.fromByteString(block.blockHash),
                     preStateHash,
                     shardId,
                     finalizationRate,
@@ -114,29 +116,19 @@ class Initializing[F[_]: Sync: Metrics: Span: Concurrent: BlockStore: CommUtil: 
                   )
               // Send request for the first store page
               _ <- CommUtil[F].sendStoreItemsRequest(preStateHash, LastFinalizedState.pageSize)
+              _ = println(s"Last finalized preStateHash: ${preStateHash}")
+              // Write last finalized state root
+              importer = RSpaceStateManager[F].importer
+              _        <- importer.setRoot(preStateHash)
+              // Request parents and justifications
+              parentBlocks        = genesis.header.parentsHashList
+              justificationBlocks = genesis.justifications.map(_.latestBlockHash)
+              blocks              = parentBlocks ++ justificationBlocks
+              _                   <- blocks.distinct.traverse(CommUtil[F].sendBlockRequest)
             } yield ()
           } else
             Log[F].info("Invalid LastFinalizedBlock received; refusing to add.")
-
     } yield ()
   }
-
-//  private def onLastFinalizedBlock(block: BlockMessage): F[Unit] =
-//    for {
-//      // Finish initialization and transition to last finalized state
-//      _ <- Log[F].info(s"Initializing transition to last finalized block hash: ${block.blockHash}")
-//      // Send request for the first store page
-//      preStateHash = Blake2b256Hash.fromByteString(ProtoUtil.preStateHash(block))
-//      _            <- CommUtil[F].sendStoreItemsRequest(preStateHash, LastFinalizedState.pageSize)
-//      // Transition to restore last finalized state
-//      _ <- transitionToLastFinalizedState(
-//            Blake2b256Hash.fromByteString(block.blockHash),
-//            preStateHash,
-//            shardId,
-//            finalizationRate,
-//            validatorId,
-//            theInit
-//          )
-//    } yield ()
 
 }

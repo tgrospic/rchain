@@ -653,8 +653,9 @@ object StoreItemsMessageRequest {
 
 final case class StoreItemsMessage(
     startPath: Seq[(Blake2b256Hash, Option[Byte])],
-    items: Seq[(Blake2b256Hash, ByteString)],
-    lastPath: Seq[(Blake2b256Hash, Option[Byte])]
+    lastPath: Seq[(Blake2b256Hash, Option[Byte])],
+    historyItems: Seq[(Blake2b256Hash, ByteString)],
+    dataItems: Seq[(Blake2b256Hash, ByteString)]
 ) extends CasperMessage {
   override def toProto: StoreItemsMessageProto = StoreItemsMessage.toProto(this)
 }
@@ -671,7 +672,6 @@ object StoreItemsMessage {
             else p.index.toByte.some
           )
       ),
-      x.items.map(y => (Blake2b256Hash.fromByteString(y.key), y.value)),
       x.lastPath.map(
         p =>
           (
@@ -679,7 +679,9 @@ object StoreItemsMessage {
             if (p.index == -1) none[Byte]
             else p.index.toByte.some
           )
-      )
+      ),
+      x.historyItems.map(y => (Blake2b256Hash.fromByteString(y.key), y.value)),
+      x.dataItems.map(y => (Blake2b256Hash.fromByteString(y.key), y.value))
     )
 
   def toProto(x: StoreItemsMessage): StoreItemsMessageProto =
@@ -687,9 +689,10 @@ object StoreItemsMessage {
       x.startPath
         .map(k => StoreNodeKeyProto(k._1.toByteString, k._2.map(_.toInt).getOrElse(-1)))
         .toList,
-      x.items.map(y => StoreItemProto(y._1.toByteString, y._2)).toList,
       x.lastPath
         .map(k => StoreNodeKeyProto(k._1.toByteString, k._2.map(_.toInt).getOrElse(-1)))
-        .toList
+        .toList,
+      x.historyItems.map(y => StoreItemProto(y._1.toByteString, y._2)).toList,
+      x.dataItems.map(y => StoreItemProto(y._1.toByteString, y._2)).toList
     )
 }

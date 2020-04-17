@@ -99,7 +99,6 @@ object Engine {
   ): F[Unit] = EngineCell[F].set(new Initializing(shardId, finalizationRate, validatorId, init))
 
   def transitionToLastFinalizedState[F[_]: Concurrent: Metrics: Span: Monad: EngineCell: Log: EventLog: BlockStore: CommUtil: TransportLayer: ConnectionsCell: RPConfAsk: Time: SafetyOracle: LastFinalizedBlockCalculator: LastApprovedBlock: BlockDagStorage: LastFinalizedStorage: RuntimeManager: Running.RequestedBlocks: EventPublisher: SynchronyConstraintChecker: LastFinalizedHeightConstraintChecker: Estimator: DeployStorage: RSpaceStateManager](
-      blockHash: Blake2b256Hash,
       stateHash: Blake2b256Hash,
       shardId: String,
       finalizationRate: Int,
@@ -107,7 +106,7 @@ object Engine {
       init: F[Unit]
   ): F[Unit] =
     EngineCell[F].set(
-      new LastFinalizedState[F](blockHash, stateHash, shardId, finalizationRate, validatorId, init)
+      new LastFinalizedState[F](stateHash, shardId, finalizationRate, validatorId, init)
     )
 
 }

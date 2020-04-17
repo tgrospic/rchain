@@ -21,7 +21,7 @@ object BlockMetadataPersistentIndex {
       private val childMapState: MonadState[F, Map[BlockHash, Set[BlockHash]]],
       private val topoSortState: MonadState[F, Vector[Vector[BlockHash]]]
   ) {
-    def add(block: BlockMetadata, isGenesis: Boolean): F[Unit] =
+    def add(block: BlockMetadata, offset: Long): F[Unit] =
       for {
         _ <- childMapState.modify { childMap =>
               block.parents
@@ -33,7 +33,6 @@ object BlockMetadataPersistentIndex {
                 .updated(block.blockHash, Set.empty[BlockHash])
             }
         _ <- if (!block.invalid) {
-              val offset = if (isGenesis) block.blockNum else 0L
               topoSortState.modify(topoSort => TopologicalSortUtil.update(topoSort, offset, block))
             } else
               ().pure[F]
