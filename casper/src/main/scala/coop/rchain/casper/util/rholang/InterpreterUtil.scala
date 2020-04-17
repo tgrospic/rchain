@@ -7,6 +7,7 @@ import coop.rchain.blockstorage.BlockStore
 import coop.rchain.blockstorage.dag.BlockDagRepresentation
 import coop.rchain.casper._
 import coop.rchain.casper.protocol._
+import coop.rchain.casper.syntax._
 import coop.rchain.casper.util.rholang.RuntimeManager._
 import coop.rchain.casper.util.{DagOperations, ProtoUtil}
 import coop.rchain.crypto.codec.Base16
@@ -94,7 +95,10 @@ object InterpreterUtil {
       val internalSystemDeploys = ProtoUtil.systemDeploys(block)
       for {
         invalidBlocksSet <- dag.invalidBlocks
-        unseenBlocksSet  <- ProtoUtil.unseenBlockHashes(dag, block)
+        isGenesis        <- BlockStore[F].isGenesis(block.blockHash)
+        _                = println(s"replayBlock BEFORE ProtoUtil.unseenBlockHashes, isGenesis = $isGenesis")
+        unseenBlocksSet <- if (!isGenesis) ProtoUtil.unseenBlockHashes(dag, block)
+                          else Set[BlockHash]().pure
         seenInvalidBlocksSet = invalidBlocksSet.filterNot(
           block => unseenBlocksSet.contains(block.blockHash)
         ) // TODO: Write test in which switching this to .filter makes it fail
@@ -103,7 +107,6 @@ object InterpreterUtil {
           .toMap
         _         <- Span[F].mark("before-process-pre-state-hash")
         blockData = BlockData.fromBlock(block)
-        isGenesis = block.header.parentsHashList.isEmpty
         replayResult <- runtimeManager.replayComputeState(initialStateHash)(
                          internalDeploys,
                          internalSystemDeploys,
