@@ -318,13 +318,13 @@ lazy val node = (project in file("node"))
         .toSeq
         .map(num => dockerAlias.value.withTag(Some(s"DRONE-${num}"))),
     dockerUpdateLatest := sys.env.get("DRONE").isEmpty,
-    dockerBaseImage := "openjdk:11-jre-slim",
+    dockerBaseImage := "oracle/graalvm-ce:20.0.0-java11",
     dockerCommands := {
       val daemon = (daemonUser in Docker).value
       Seq(
         Cmd("FROM", dockerBaseImage.value),
-        ExecCmd("RUN", "apt", "update"),
-        ExecCmd("RUN", "apt", "install", "-yq", "openssl", "openssh-server", "procps"),
+        ExecCmd("RUN", "yum", "update", "-y"),
+        ExecCmd("RUN", "yum", "install", "-yq", "openssl", "openssh-server", "procps"),
         Cmd("LABEL", s"""MAINTAINER="${maintainer.value}""""),
         Cmd("WORKDIR", (defaultLinuxInstallLocation in Docker).value),
         Cmd("ADD", s"--chown=$daemon:$daemon opt /opt"),
