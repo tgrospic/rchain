@@ -274,7 +274,8 @@ object RSpace {
       scheduler: ExecutionContext,
       metricsF: Metrics[F],
       spanF: Span[F],
-      par: Parallel[F]
+      par: Parallel[F],
+      kvm: KeyValueStoreManager[F]
   ): F[(ISpace[F, C, P, A, K], IReplaySpace[F, C, P, A, K], HistoryRepository[F, C, P, A, K])] = {
     val v2Dir = dataDir.resolve("v2")
     for {
@@ -307,7 +308,8 @@ object RSpace {
       scheduler: ExecutionContext,
       metricsF: Metrics[F],
       spanF: Span[F],
-      par: Parallel[F]
+      par: Parallel[F],
+      kvm: KeyValueStoreManager[F]
   ): F[ISpace[F, C, P, A, K]] =
     setUp[F, C, P, A, K](dataDir, mapSize, branch).map {
       case (historyReader, store) =>
@@ -325,7 +327,8 @@ object RSpace {
       sa: Serialize[A],
       sk: Serialize[K],
       concurrent: Concurrent[F],
-      par: Parallel[F]
+      par: Parallel[F],
+      kvm: KeyValueStoreManager[F]
   ): F[(HistoryRepository[F, C, P, A, K], HotStore[F, C, P, A, K])] = {
 
     import coop.rchain.rspace.history._
@@ -346,9 +349,9 @@ object RSpace {
       } yield ()
 
     for {
-      _ <- checkCreateDir(coldStore.path)
-      _ <- checkCreateDir(historyStore.path)
-      _ <- checkCreateDir(rootsStore.path)
+//      _ <- checkCreateDir(coldStore.path)
+//      _ <- checkCreateDir(historyStore.path)
+//      _ <- checkCreateDir(rootsStore.path)
       historyReader <- HistoryRepositoryInstances
                         .lmdbRepository[F, C, P, A, K](config)
       store <- HotStore.empty(historyReader)

@@ -14,6 +14,7 @@ import coop.rchain.rholang.interpreter.accounting.Chargeable._
 import coop.rchain.rspace.history.Branch
 import coop.rchain.rspace.{Match, RSpace}
 import coop.rchain.shared.Log
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import org.scalactic.TripleEqualsSupport
@@ -831,6 +832,7 @@ class RholangMethodsCostsSpec
     import coop.rchain.catscontrib.TaskContrib._
     import coop.rchain.rholang.interpreter.storage._
     implicit val m: Match[Task, BindPattern, ListParWithRandom] = matchListPar[Task]
+    implicit val kvm                                            = InMemoryStoreManager[Task]
     dbDir = Files.createTempDirectory("rholang-interpreter-test-")
     space = RSpace
       .create[

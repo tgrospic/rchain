@@ -18,6 +18,7 @@ import monix.execution.Scheduler.Implicits.global
 import scala.concurrent.duration._
 import coop.rchain.shared.PathOps._
 import coop.rchain.rholang.interpreter.storage._
+import coop.rchain.store.InMemoryStoreManager
 
 final case class TestFixture(space: RhoISpace[Task], reducer: DebruijnInterpreter[Task, Task.Par])
 
@@ -32,6 +33,7 @@ trait PersistentStoreTester {
 
     implicit val cost = CostAccounting.emptyCost[Task].unsafeRunSync
     implicit val m    = matchListPar[Task]
+    implicit val kvm  = InMemoryStoreManager[Task]
     val space = RSpace
       .create[
         Task,

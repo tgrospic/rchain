@@ -1,10 +1,10 @@
 package coop.rchain.rspace.history
 
-import cats.implicits._
-import cats.effect.Concurrent
 import cats.Parallel
-import coop.rchain.rspace.state.{RSpaceExporter, RSpaceImporter}
+import cats.effect.Concurrent
+import cats.implicits._
 import coop.rchain.rspace.state.instances.{RSpaceExporterImpl, RSpaceImporterImpl}
+import coop.rchain.rspace.state.{RSpaceExporter, RSpaceImporter}
 import coop.rchain.rspace.{Blake2b256Hash, HistoryReader, HotStoreAction}
 import coop.rchain.store.KeyValueStoreManager
 import org.lmdbjava.EnvFlags
@@ -40,7 +40,7 @@ final case class LMDBRSpaceStorageConfig(
 
 object HistoryRepositoryInstances {
 
-  def lmdbRepository[F[_]: Concurrent: Parallel, C, P, A, K](
+  def lmdbRepository[F[_]: Concurrent: Parallel: KeyValueStoreManager, C, P, A, K](
       config: LMDBRSpaceStorageConfig
   )(
       implicit codecC: Codec[C],
@@ -50,14 +50,17 @@ object HistoryRepositoryInstances {
   ): F[HistoryRepository[F, C, P, A, K]] =
     for {
       // Roots store
-      rootsLMDBStore  <- StoreInstances.lmdbStore[F](config.rootsStore)
+//      rootsLMDBStore  <- StoreInstances.lmdbStore[F](config.rootsStore)
+      rootsLMDBStore  <- StoreFactory.keyValueStore[F]("roots")
       rootsRepository = new RootRepository[F](RootsStoreInstances.rootsStore[F](rootsLMDBStore))
       currentRoot     <- rootsRepository.currentRoot()
       // Cold store
-      coldLMDBStore <- StoreInstances.lmdbStore[F](config.coldStore)
+//      coldLMDBStore <- StoreInstances.lmdbStore[F](config.coldStore)
+      coldLMDBStore <- StoreFactory.keyValueStore[F]("cold")
       coldStore     = ColdStoreInstances.coldStore[F](coldLMDBStore)
       // History store
-      historyLMDBStore <- StoreInstances.lmdbStore[F](config.historyStore)
+//      historyLMDBStore <- StoreInstances.lmdbStore[F](config.historyStore)
+      historyLMDBStore <- StoreFactory.keyValueStore[F]("history")
       historyStore     = HistoryStoreInstances.historyStore[F](historyLMDBStore)
       history          = HistoryInstances.merging(currentRoot, historyStore)
       // RSpace importer/exporter / directly operates on Store (lmdb)

@@ -19,6 +19,7 @@ import coop.rchain.metrics.{Metrics, NoopSpan}
 import coop.rchain.rholang.interpreter.Runtime
 import coop.rchain.rholang.interpreter.util.RevAddress
 import coop.rchain.shared.Log
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 
 import scala.collection.mutable
@@ -102,6 +103,7 @@ object GenesisBuilder {
     implicit val log: Log.NOPLog[Task]               = new Log.NOPLog[Task]
     implicit val metricsEff: Metrics[Task]           = new metrics.Metrics.MetricsNOP[Task]
     implicit val spanEff                             = NoopSpan[Task]()
+    implicit val kvm                                 = InMemoryStoreManager[Task]
 
     implicit val scheduler = monix.execution.Scheduler.Implicits.global
 

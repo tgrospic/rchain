@@ -32,6 +32,7 @@ import monix.eval._
 import monix.execution.atomic.AtomicAny
 import org.lmdbjava.EnvFlags
 import coop.rchain.metrics.NoopSpan
+import coop.rchain.store.InMemoryStoreManager
 
 trait StorageTestsBase[F[_], C, P, A, K] extends FlatSpec with Matchers with OptionValues {
   type T    = ISpace[F, C, P, A, K]
@@ -86,6 +87,8 @@ trait StorageTestsBase[F[_], C, P, A, K] extends FlatSpec with Matchers with Opt
       storeConfig("history"),
       storeConfig("roots")
     )
+
+    implicit val kvm = InMemoryStoreManager[F]
 
     run(for {
       historyRepository    <- HistoryRepositoryInstances.lmdbRepository[F, C, P, A, K](config)

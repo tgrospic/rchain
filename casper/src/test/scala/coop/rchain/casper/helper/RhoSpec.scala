@@ -20,6 +20,7 @@ import coop.rchain.rholang.build.CompiledRholangSource
 import coop.rchain.rholang.interpreter.Runtime.SystemProcess
 import coop.rchain.rholang.interpreter.{PrettyPrinter, Runtime}
 import coop.rchain.shared.Log
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{AppendedClues, FlatSpec, Matchers}
@@ -38,6 +39,7 @@ class RhoSpec(
   implicit val logger: Log[Task]         = Log.log[Task]
   implicit val metricsEff: Metrics[Task] = new Metrics.MetricsNOP[Task]
   implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
+  implicit val kvm                       = InMemoryStoreManager[Task]
 
   private val printer = PrettyPrinter()
 

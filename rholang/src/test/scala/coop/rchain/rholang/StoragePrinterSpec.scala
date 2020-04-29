@@ -16,6 +16,7 @@ import cats.syntax._
 import coop.rchain.crypto.PrivateKey
 import coop.rchain.crypto.codec.Base16
 import coop.rchain.crypto.signatures.{Secp256k1, Signed}
+import coop.rchain.store.InMemoryStoreManager
 
 import scala.concurrent.duration._
 
@@ -30,6 +31,7 @@ class StoragePrinterSpec extends FlatSpec with Matchers {
   implicit val logF: Log[Task]            = new Log.NOPLog[Task]
   implicit val noopMetrics: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
   implicit val noopSpan: Span[Task]       = NoopSpan[Task]()
+  implicit val kvm                        = InMemoryStoreManager[Task]
 
   behavior of "StoragePrinter.prettyPrintUnmatchedSends"
 

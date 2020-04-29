@@ -12,6 +12,7 @@ import coop.rchain.rholang.interpreter.accounting.utils._
 import coop.rchain.rholang.interpreter.errors.OutOfPhlogistonsError
 import coop.rchain.rspace.Checkpoint
 import coop.rchain.shared.Log
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Prop.forAllNoShrink
@@ -33,6 +34,7 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
     implicit val metricsEff: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
     implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
     implicit val ms: Metrics.Source        = Metrics.BaseSource
+    implicit val kvm                       = InMemoryStoreManager[Task]
 
     val resources = for {
       dir     <- Resources.mkTempDir[Task]("cost-accounting-spec-")
@@ -65,6 +67,7 @@ class CostAccountingSpec extends FlatSpec with Matchers with PropertyChecks with
     implicit val metricsEff: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
     implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
     implicit val ms: Metrics.Source        = Metrics.BaseSource
+    implicit val kvm                       = InMemoryStoreManager[Task]
 
     val resources = for {
       dir     <- Resources.mkTempDir[Task]("cost-accounting-spec-")

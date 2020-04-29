@@ -7,6 +7,7 @@ import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.rholang.Resources.mkRuntime
 import coop.rchain.rholang.interpreter.{EvaluateResult, InterpreterUtil}
 import coop.rchain.shared.{Log, Resources}
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{FunSuite, Matchers}
@@ -22,6 +23,7 @@ class CompilerTests extends FunSuite with Matchers {
   implicit val logF: Log[Task]            = new Log.NOPLog[Task]
   implicit val noopMetrics: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
   implicit val noopSpan: Span[Task]       = NoopSpan[Task]()
+  implicit val kvm                        = InMemoryStoreManager[Task]
 
   private val testFiles: Iterator[Path] =
     Files.walk(Paths.get(getClass.getResource("/tests").getPath)).iterator().asScala

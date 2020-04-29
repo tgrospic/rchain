@@ -1301,10 +1301,11 @@ trait InMemoryReplayRSpaceTestsBase[C, P, A, K] extends ReplayRSpaceTestsBase[C,
       storeConfig("roots")
     )
 
-    implicit val cc = sc.toCodec
-    implicit val cp = sp.toCodec
-    implicit val ca = sa.toCodec
-    implicit val ck = sk.toCodec
+    implicit val cc  = sc.toCodec
+    implicit val cp  = sp.toCodec
+    implicit val ca  = sa.toCodec
+    implicit val ck  = sk.toCodec
+    implicit val kvm = InMemoryStoreManager[Task]
 
     (for {
       historyRepository <- HistoryRepositoryInstances.lmdbRepository[Task, C, P, A, K](config)

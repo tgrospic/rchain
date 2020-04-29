@@ -32,6 +32,7 @@ import coop.rchain.rholang.interpreter.errors.BugFoundError
 import coop.rchain.rholang.interpreter.{accounting, ParBuilderUtil}
 import coop.rchain.shared.scalatestcontrib.effectTest
 import coop.rchain.shared.{Log, Time}
+import coop.rchain.store.InMemoryStoreManager
 import coop.rchain.{metrics, rholang}
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
@@ -46,6 +47,7 @@ class RuntimeManagerTest extends FlatSpec with Matchers {
   implicit val log: Log[Task]            = Log.log[Task]
   implicit val metricsEff: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
   implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
+  implicit val kvm                       = InMemoryStoreManager[Task]
 
   val genesisContext = GenesisBuilder.buildGenesis()
   val genesis        = genesisContext.genesisBlock

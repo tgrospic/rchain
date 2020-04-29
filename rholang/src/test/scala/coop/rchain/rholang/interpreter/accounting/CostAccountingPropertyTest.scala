@@ -12,6 +12,7 @@ import coop.rchain.rholang.syntax.rholang_mercury.Absyn.{PPar, Proc}
 import coop.rchain.rholang.syntax.rholang_mercury.PrettyPrinter
 import coop.rchain.rholang.{GenTools, ProcGen}
 import coop.rchain.shared.Log
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Test.Parameters
@@ -101,6 +102,7 @@ object CostAccountingPropertyTest {
     implicit val noopMetrics: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
     implicit val noopSpan: Span[Task]       = NoopSpan[Task]()
     implicit val ms: Metrics.Source         = Metrics.BaseSource
+    implicit val kvm                        = InMemoryStoreManager[Task]
 
     val prefix = "cost-accounting-property-test"
     mkRuntime[Task](prefix, 1024 * 1024 * 1024L).use { runtime =>

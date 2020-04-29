@@ -448,7 +448,7 @@ object Runtime {
     } yield ()
   }
 
-  def setupRSpace[F[_]: Concurrent: ContextShift: Parallel: Log: Metrics: Span](
+  def setupRSpace[F[_]: Concurrent: ContextShift: Parallel: KeyValueStoreManager: Log: Metrics: Span](
       dataDir: Path,
       mapSize: Long
   )(

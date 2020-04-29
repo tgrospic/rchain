@@ -1,13 +1,12 @@
 package coop.rchain.rholang
 
 import org.scalatest._
-
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.Expr.ExprInstance.{GInt, GString}
 import coop.rchain.models.rholang.implicits._
 import coop.rchain.shared.Log
 import coop.rchain.rholang.interpreter.{EvaluateResult, InterpreterUtil, Runtime}
-
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 
@@ -21,6 +20,7 @@ class PeekSpec extends FlatSpec with Matchers {
   implicit val logF: Log[Task]            = new Log.NOPLog[Task]
   implicit val noopMetrics: Metrics[Task] = new Metrics.MetricsNOP[Task]
   implicit val noopSpan: Span[Task]       = NoopSpan[Task]()
+  implicit val kvm                        = InMemoryStoreManager[Task]
 
   val tmpPrefix = "peek-spec-"
 

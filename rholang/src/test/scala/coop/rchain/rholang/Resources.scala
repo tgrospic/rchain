@@ -15,6 +15,7 @@ import coop.rchain.rspace
 import coop.rchain.rspace.RSpace
 import coop.rchain.rspace.history.{Branch, HistoryRepository}
 import coop.rchain.shared.Log
+import coop.rchain.store.{InMemoryStoreManager, KeyValueStoreManager}
 import monix.execution.Scheduler
 
 import scala.reflect.io.Directory
@@ -46,6 +47,7 @@ object Resources {
     import coop.rchain.rholang.interpreter.storage._
     implicit val m: rspace.Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
     import scala.concurrent.ExecutionContext.Implicits.global
+    implicit val kvm = InMemoryStoreManager[F]
 
     def mkRspace(dbDir: Path): F[RhoISpace[F]] =
       RSpace.create[
@@ -64,20 +66,26 @@ object Resources {
       prefix: String,
       storageSize: Long = 1024 * 1024 * 1024L,
       additionalSystemProcesses: Seq[SystemProcess.Definition[F]] = Seq.empty
-  )(implicit scheduler: Scheduler): Resource[F, Runtime[F]] =
+  )(implicit scheduler: Scheduler, kvm: KeyValueStoreManager[F]): Resource[F, Runtime[F]] =
     mkRuntimeWithHistory(prefix, storageSize, additionalSystemProcesses).map(_._1)
 
   def mkRuntimeWithHistory[F[_]: Log: Metrics: Span: Concurrent: Parallel: ContextShift](
       prefix: String,
       storageSize: Long,
       additionalSystemProcesses: Seq[SystemProcess.Definition[F]]
-  )(implicit scheduler: Scheduler): Resource[F, (Runtime[F], RhoHistoryRepository[F])] =
+  )(
+      implicit scheduler: Scheduler,
+      kvm: KeyValueStoreManager[F]
+  ): Resource[F, (Runtime[F], RhoHistoryRepository[F])] =
     mkTempDir[F](prefix) >>= (mkRuntimeAt(_)(storageSize, additionalSystemProcesses))
 
   def mkRuntimeAt[F[_]: Log: Metrics: Span: Concurrent: Parallel: ContextShift](path: Path)(
       storageSize: Long = 1024 * 1024 * 1024L,
       additionalSystemProcesses: Seq[SystemProcess.Definition[F]] = Seq.empty
-  )(implicit scheduler: Scheduler): Resource[F, (Runtime[F], RhoHistoryRepository[F])] =
+  )(
+      implicit scheduler: Scheduler,
+      kvm: KeyValueStoreManager[F]
+  ): Resource[F, (Runtime[F], RhoHistoryRepository[F])] =
     Resource.make[F, (Runtime[F], RhoHistoryRepository[F])](
       Runtime.setupRSpace[F](path, storageSize) >>= {
         case (space, replay, hr) =>

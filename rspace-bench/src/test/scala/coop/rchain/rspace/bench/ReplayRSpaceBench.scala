@@ -15,6 +15,7 @@ import coop.rchain.rspace.examples.AddressBookExample.implicits._
 import coop.rchain.rspace.history.Branch
 import coop.rchain.shared.Log
 import coop.rchain.shared.PathOps.RichPath
+import coop.rchain.store.InMemoryStoreManager
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -63,6 +64,7 @@ object ReplayRSpaceBench {
     implicit val logF: Log[Id]            = new Log.NOPLog[Id]
     implicit val noopMetrics: Metrics[Id] = new metrics.Metrics.MetricsNOP[Id]
     implicit val noopSpan: Span[Id]       = NoopSpan[Id]()
+    implicit val kvm                      = InMemoryStoreManager[Id]
     val consumeChannel                    = Channel("consume")
     val produceChannel                    = Channel("produce")
     val matches                           = List(CityMatch(city = "Crystal Lake"))

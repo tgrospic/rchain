@@ -10,6 +10,7 @@ import coop.rchain.rholang.interpreter.accounting.utils.costLog
 import coop.rchain.rholang.interpreter.accounting.{_cost, Cost, CostAccounting}
 import coop.rchain.rspace.SoftCheckpoint
 import coop.rchain.shared.Log
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{FlatSpec, Matchers}
@@ -121,6 +122,7 @@ class ReplaySpec extends FlatSpec with Matchers {
     implicit val metricsEff: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
     implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
     implicit val ms: Metrics.Source        = Metrics.BaseSource
+    implicit val kvm                       = InMemoryStoreManager[Task]
 
     val resources = for {
       dir     <- Resources.mkTempDir[Task]("cost-accounting-spec-")

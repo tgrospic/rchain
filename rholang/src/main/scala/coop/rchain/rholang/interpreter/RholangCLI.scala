@@ -14,12 +14,11 @@ import coop.rchain.rholang.interpreter.Runtime.RhoISpace
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rholang.interpreter.errors._
 import coop.rchain.rholang.interpreter.storage.StoragePrinter
-import coop.rchain.shared.Resources
+import coop.rchain.shared.{Log, Resources}
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.{Coeval, Task}
 import monix.execution.{CancelableFuture, Scheduler}
 import org.rogach.scallop.{stringListConverter, ScallopConf}
-import coop.rchain.shared.Log
-import coop.rchain.store.InMemoryStoreManager
 
 import scala.annotation.tailrec
 import scala.concurrent.Await
@@ -65,6 +64,7 @@ object RholangCLI {
     implicit val metricsF: Metrics[Task] = new Metrics.MetricsNOP[Task]()
     implicit val spanF: Span[Task]       = NoopSpan[Task]()
     implicit val parF: Parallel[Task]    = Task.catsParallel
+    implicit val kvm                     = InMemoryStoreManager[Task]
 
     val runtime = (for {
       sarAndHR           <- Runtime.setupRSpace[Task](conf.dataDir(), conf.mapSize())

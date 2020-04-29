@@ -16,6 +16,7 @@ import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.rholang.Resources.{mkRuntimeAt, mkTempDir}
 import coop.rchain.rholang.interpreter.Runtime.RhoHistoryRepository
 import coop.rchain.shared.Log
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler
 
@@ -35,6 +36,7 @@ object Resources {
     implicit val log               = Log.log[F]
     implicit val metricsEff        = new metrics.Metrics.MetricsNOP[F]
     implicit val noopSpan: Span[F] = NoopSpan[F]()
+    implicit val kvm               = InMemoryStoreManager[F]
 
     for {
       runtime        <- mkRuntimeAt[F](storageDirectory)(storageSize)
@@ -52,6 +54,7 @@ object Resources {
     implicit val log               = Log.log[F]
     implicit val metricsEff        = new metrics.Metrics.MetricsNOP[F]
     implicit val noopSpan: Span[F] = NoopSpan[F]()
+    implicit val kvm               = InMemoryStoreManager[F]
 
     for {
       rhr            <- mkRuntimeAt[F](storageDirectory)(storageSize)

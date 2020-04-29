@@ -362,7 +362,8 @@ object ReplayRSpace {
       scheduler: ExecutionContext,
       metricsF: Metrics[F],
       spanF: Span[F],
-      par: Parallel[F]
+      par: Parallel[F],
+      kvm: KeyValueStoreManager[F]
   ): F[IReplaySpace[F, C, P, A, K]] =
     RSpace.setUp[F, C, P, A, K](dataDir, mapSize, branch).map {
       case (historyReader, store) =>

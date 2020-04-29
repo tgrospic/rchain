@@ -3,6 +3,7 @@ package coop.rchain.state
 import java.nio.file.{Path, Paths}
 
 import cats.syntax.all._
+import coop.rchain.casper.storage.RNodeKeyValueStoreManager
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.rholang.interpreter.Runtime
 import coop.rchain.shared.Log
@@ -18,7 +19,11 @@ class TrieExporterSpec extends FlatSpec with Matchers {
 
   private def createExporterWithStores(dir: Path) =
     for {
-      rspace              <- Runtime.setupRSpace[Task](dir, 1073741824L)
+      storeMngr <- RNodeKeyValueStoreManager[Task](dir)
+      rspace <- {
+        implicit val kvm = storeMngr
+        Runtime.setupRSpace[Task](dir, 1073741824L)
+      }
       (_, _, historyRepo) = rspace
       exporter            <- historyRepo.exporter
     } yield exporter

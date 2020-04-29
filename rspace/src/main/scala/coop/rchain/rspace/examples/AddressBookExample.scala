@@ -3,22 +3,20 @@ package coop.rchain.rspace.examples
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.nio.file.{Files, Path}
 
-import cats.{Applicative, Id, Parallel}
 import cats.effect.{Concurrent, ContextShift}
+import cats.{Applicative, Id}
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.rspace.ISpace.IdISpace
+import coop.rchain.rspace.{RSpace, _}
 import coop.rchain.rspace.history.Branch
-import coop.rchain.rspace._
-import coop.rchain.rspace.{RSpace, ReplayRSpace}
+import coop.rchain.rspace.util._
 import coop.rchain.shared.Language.ignore
 import coop.rchain.shared.{Log, Serialize}
-import coop.rchain.rspace.util._
 import coop.rchain.store.InMemoryStoreManager
-
-import scala.concurrent.ExecutionContext
 import scodec.bits.ByteVector
 
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
 @SuppressWarnings(Array("org.wartremover.warts.EitherProjectionPartial"))
@@ -206,6 +204,7 @@ object AddressBookExample {
     implicit val spanF: Span[Id]       = NoopSpan[Id]()
     // Here we define a temporary place to put the store's files
     val storePath: Path = Files.createTempDirectory("rspace-address-book-example-")
+    implicit val kvMan  = InMemoryStoreManager[Id]
 
     // Let's define our store
     val space =
@@ -244,9 +243,9 @@ object AddressBookExample {
     implicit val log: Log[Id]          = Log.log
     implicit val metricsF: Metrics[Id] = new Metrics.MetricsNOP[Id]()
     implicit val spanF: Span[Id]       = NoopSpan[Id]()
-
     // Here we define a temporary place to put the store's files
     val storePath: Path = Files.createTempDirectory("rspace-address-book-example-")
+    implicit val kvMan  = InMemoryStoreManager[Id]
 
     // Let's define our store
     val space =
@@ -338,9 +337,10 @@ object AddressBookExample {
     implicit val log: Log[Id]          = Log.log
     implicit val metricsF: Metrics[Id] = new Metrics.MetricsNOP[Id]()
     implicit val spanF: Span[Id]       = NoopSpan[Id]()
-
     // Here we define a temporary place to put the store's files
-    val storePath = Files.createTempDirectory("rspace-address-book-example-")
+    val storePath      = Files.createTempDirectory("rspace-address-book-example-")
+    implicit val kvMan = InMemoryStoreManager[Id]
+
     // Let's define our store
     val space =
       RSpace.create[Id, Channel, Pattern, Entry, Printer](

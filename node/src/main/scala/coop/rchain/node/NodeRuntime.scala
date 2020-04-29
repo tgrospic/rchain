@@ -781,19 +781,23 @@ object NodeRuntime {
         Metrics[F],
         span
       )
+      evalStoreManager <- RNodeKeyValueStoreManager(cliConf.storage)
       evalRuntime <- {
-        implicit val s  = rspaceScheduler
-        implicit val sp = span
+        implicit val s   = rspaceScheduler
+        implicit val sp  = span
+        implicit val kvm = evalStoreManager
         Runtime.setupRSpace[F](cliConf.storage, cliConf.size) >>= {
           case (space, replay, _) => Runtime.createWithEmptyCost[F]((space, replay), Seq.empty)
         }
       }
-      _ <- Runtime.bootstrapRegistry[F](evalRuntime)
+      _                  <- Runtime.bootstrapRegistry[F](evalRuntime)
+      casperStoreManager <- RNodeKeyValueStoreManager(casperConf.storage)
       casperInitialized <- {
-        implicit val s  = rspaceScheduler
-        implicit val sp = span
-        implicit val bs = blockStore
-        implicit val bd = blockDagStorage
+        implicit val s   = rspaceScheduler
+        implicit val sp  = span
+        implicit val bs  = blockStore
+        implicit val bd  = blockDagStorage
+        implicit val kvm = casperStoreManager
         for {
           sarAndHR            <- Runtime.setupRSpace[F](casperConf.storage, casperConf.size)
           (space, replay, hr) = sarAndHR

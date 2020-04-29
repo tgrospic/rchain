@@ -29,6 +29,7 @@ import coop.rchain.p2p.EffectsTestInstances.LogStub
 import coop.rchain.rholang.interpreter.Runtime
 import coop.rchain.shared.Time
 import coop.rchain.shared.scalatestcontrib._
+import coop.rchain.store.InMemoryStoreManager
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest._
@@ -731,6 +732,7 @@ class ValidateTest
 
       val storageDirectory  = Files.createTempDirectory(s"hash-set-casper-test-genesis-")
       val storageSize: Long = 1024L * 1024L * 1024L
+      implicit val kvm      = InMemoryStoreManager[Task]
       for {
         sar               <- Runtime.setupRSpace[Task](storageDirectory, storageSize)
         activeRuntime     <- Runtime.createWithEmptyCost[Task]((sar._1, sar._2))
