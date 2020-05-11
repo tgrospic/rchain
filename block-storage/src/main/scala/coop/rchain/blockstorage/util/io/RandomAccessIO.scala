@@ -1,18 +1,46 @@
 package coop.rchain.blockstorage.util.io
 
 import java.io.{EOFException, FileNotFoundException, RandomAccessFile}
+import java.nio.{ByteBuffer, MappedByteBuffer}
+import java.nio.channels.FileChannel
 import java.nio.file.Path
 
 import cats.effect.{Resource, Sync}
 import cats.implicits._
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.util.io.IOError.RaiseIOError
+import coop.rchain.shared.Resources
 
 import scala.language.higherKinds
 
 final case class RandomAccessIO[F[_]: Sync: RaiseIOError] private (
     private val file: RandomAccessFile
 ) {
+  def readSlice(offset: Long): F[Array[Byte]] = Sync[F].delay {
+    val fileCh = file.getChannel
+    val bufferInt = fileCh
+      .map(FileChannel.MapMode.READ_ONLY, offset, 4)
+    val length = bufferInt.getInt
+
+    val buffer = fileCh
+      .map(FileChannel.MapMode.READ_ONLY, offset + 4, length.toLong)
+
+    val ret = new Array[Byte](length)
+    val _   = buffer.get(ret)
+    ret
+  }
+
+  def readByteBuffer(offset: Long): F[ByteBuffer] = Sync[F].delay {
+    val bufferInt = file.getChannel
+      .map(FileChannel.MapMode.READ_ONLY, offset, 4)
+    val length = bufferInt.getInt
+
+    val buffer = file.getChannel
+      .map(FileChannel.MapMode.READ_ONLY, offset + 4, length.toLong)
+
+    buffer
+  }
+
   def close: F[Unit] =
     handleIo(file.close(), ClosingFailed.apply)
 

@@ -1,5 +1,7 @@
 package coop.rchain.blockstorage
 
+import java.nio.ByteBuffer
+
 import cats._
 import cats.effect.Sync
 import cats.effect.concurrent.Ref
@@ -59,6 +61,12 @@ class InMemBlockStore[F[_]] private ()(
     } yield ()
 
   override def close(): F[Unit] = monadF.pure(())
+
+  override def iterateIndex[T](f: Iterator[(BlockHash, Long)] => T): F[T] = ???
+
+  override def readByteBuffer(offset: Long): F[ByteBuffer] = ???
+
+  override def readSlice(offset: Long): F[Array[Byte]] = ???
 }
 
 object InMemBlockStore {

@@ -1,5 +1,7 @@
 package coop.rchain.blockstorage
 
+import java.nio.ByteBuffer
+
 import cats.Applicative
 import cats.implicits._
 import coop.rchain.casper.protocol.{ApprovedBlock, BlockMessage}
@@ -15,6 +17,10 @@ trait BlockStore[F[_]] {
     put((blockHash, blockMessage))
 
   def get(blockHash: BlockHash): F[Option[BlockMessage]]
+
+  def readByteBuffer(offset: Long): F[ByteBuffer]
+
+  def readSlice(offset: Long): F[Array[Byte]]
 
   /**
     * Iterates over BlockStore and loads first n blocks according to predicate
@@ -41,6 +47,8 @@ trait BlockStore[F[_]] {
   def clear(): F[Unit]
 
   def close(): F[Unit]
+
+  def iterateIndex[T](f: Iterator[(BlockHash, Long)] => T): F[T]
 }
 
 object BlockStore {

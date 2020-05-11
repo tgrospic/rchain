@@ -1,6 +1,6 @@
 package coop.rchain.blockstorage
 
-import java.nio.ByteBuffer
+import java.nio.{ByteBuffer, MappedByteBuffer}
 import java.nio.file._
 
 import cats.Monad
@@ -8,7 +8,6 @@ import cats.effect.concurrent.Semaphore
 import cats.effect.{Concurrent, Sync}
 import cats.implicits._
 import cats.mtl.MonadState
-
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.FileLMDBIndexBlockStore.Checkpoint
 import coop.rchain.blockstorage.StorageError.StorageErr
@@ -26,12 +25,11 @@ import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.shared.ByteStringOps._
 import coop.rchain.shared.Language.ignore
 import coop.rchain.shared.{AtomicMonadState, Log}
-
 import monix.execution.atomic.AtomicAny
 import org.lmdbjava.DbiFlags.MDB_CREATE
 import org.lmdbjava._
-import scala.util.matching.Regex
 
+import scala.util.matching.Regex
 import coop.rchain.metrics.{Metrics, MetricsSemaphore}
 import coop.rchain.metrics.Metrics.Source
 
@@ -71,14 +69,28 @@ class FileLMDBIndexBlockStore[F[_]: Monad: Sync: RaiseIOError: Log] private (
   private[this] def modifyCurrentIndex(f: Int => Int): F[Unit] =
     state.modify(s => s.copy(currentIndex = f(s.currentIndex)))
 
+  def readByteBuffer(offset: Long) =
+    for {
+      storageFile <- getBlockMessageRandomAccessFile
+      buffer      <- storageFile.readByteBuffer(offset)
+    } yield buffer
+
+  def readSlice(offset: Long) =
+    for {
+      storageFile <- getBlockMessageRandomAccessFile
+      bytes       <- storageFile.readSlice(offset)
+    } yield bytes
+
   private def readBlockMessage(indexEntry: IndexEntry): F[BlockMessageProto] = {
+
     def readBlockMessageFromFile(storageFile: RandomAccessIO[F]): F[BlockMessageProto] =
       for {
         _                      <- storageFile.seek(indexEntry.offset)
         blockMessageSizeOpt    <- storageFile.readInt
         blockMessagesByteArray = Array.ofDim[Byte](blockMessageSizeOpt.get)
         _                      <- storageFile.readFully(blockMessagesByteArray)
-        blockMessage           = BlockMessageProto.parseFrom(blockMessagesByteArray)
+//        blockMessagesByteArray <- storageFile.readSlice(indexEntry.offset)
+        blockMessage = BlockMessageProto.parseFrom(blockMessagesByteArray)
       } yield blockMessage
 
     for {
@@ -211,6 +223,16 @@ class FileLMDBIndexBlockStore[F[_]: Monad: Sync: RaiseIOError: Log] private (
         _                            <- index.close
       } yield ()
     )
+
+  override def iterateIndex[T](f: Iterator[(BlockHash, Long)] => T): F[T] =
+    for {
+      items <- index.iterate { i =>
+                f(
+                  i.map(kv => (ByteString.copyFrom(kv.key()), kv.`val`()))
+                    .map { case (key, value) => (key, IndexEntry.load(value).offset) }
+                )
+              }
+    } yield items
 }
 
 object FileLMDBIndexBlockStore {
