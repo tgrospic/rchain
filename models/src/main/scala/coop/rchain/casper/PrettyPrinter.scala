@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString
 import coop.rchain.casper.protocol._
 import coop.rchain.crypto.codec._
 import coop.rchain.crypto.signatures.Signed
+import scodec.bits.ByteVector
 
 object PrettyPrinter {
 
@@ -16,16 +17,21 @@ object PrettyPrinter {
       case _               => "Unknown consensus protocol message"
     }
 
+  def bsStr(x: ByteString)        = ByteVector(x.toByteArray).toHex.take(10)
+  def parentsStr(b: BlockMessage) = b.header.parentsHashList.map(x => s"${bsStr(x)}").mkString(", ")
   // TODO shouldn header.parentsHashList be nonempty list?
   private def buildString(b: BlockMessage): String =
     b.header.parentsHashList.headOption
-      .fold(s"Block ${buildString(b.blockHash)} with missing elements")(
+      .fold(
+        s"${buildString(b.blockHash)} parents: -"
+      )(
         mainParent =>
-          s"Block #${b.body.state.blockNumber} (${buildString(b.blockHash)}) " +
-            s"-- Sender ID ${buildString(b.sender)} " +
-            s"-- M Parent Hash ${buildString(mainParent)} " +
-            s"-- Contents ${buildString(b.body.state)}" +
-            s"-- Shard ID ${limit(b.shardId, 10)}"
+          s"${buildString(b.blockHash)} " +
+            //            s"-- Sender ID ${buildString(b.sender)} " +
+            //            s"-- M Parent Hash ${buildString(mainParent)} " +
+            s"parents: ${parentsStr(b)} "
+        //            s"-- Contents ${buildString(b.body.state)}" +
+        //            s"-- Shard ID ${limit(b.shardId, 10)}"
       )
 
   def buildString(bh: BlockHashMessage): String =

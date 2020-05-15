@@ -33,6 +33,7 @@ import coop.rchain.shared.{AtomicMonadState, Log, LogSource}
 import monix.execution.atomic.AtomicAny
 import org.lmdbjava.DbiFlags.MDB_CREATE
 import org.lmdbjava.{Env, EnvFlags}
+import scodec.bits.ByteVector
 
 import scala.ref.WeakReference
 import scala.util.matching.Regex
@@ -269,10 +270,14 @@ final class BlockDagFileStorage[F[_]: Concurrent: Sync: Log: RaiseIOError] priva
                }
     } yield result
 
+  def bsStr(x: ByteString)             = ByteVector(x.toByteArray).toHex.take(10)
+  def parentsStr(bxs: Set[ByteString]) = bxs.map(x => s"${bsStr(x)}").mkString(",")
   private def representation: F[BlockDagRepresentation[F]] =
     for {
       latestMessages      <- latestMessagesIndex.data
       childMap            <- blockMetadataIndex.childMapData
+      childsStr           = childMap.map { case (k, v) => (bsStr(k), parentsStr(v)) }
+      _                   = println(s">> GET_DAG_CHILDREN_MAP ${childsStr}")
       blockMetadataMap    <- blockMetadataIndex.blockMetadataData
       topoSort            <- blockMetadataIndex.topoSortData
       blockHashesByDeploy <- deployIndex.data
