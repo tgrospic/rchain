@@ -1,4 +1,4 @@
-package coop.rchain.casper
+package coop.rchain.casper.multiparent
 
 import org.scalatest.{FlatSpec, Inspectors, Matchers}
 

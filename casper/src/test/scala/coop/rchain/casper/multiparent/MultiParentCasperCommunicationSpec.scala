@@ -1,4 +1,4 @@
-package coop.rchain.casper
+package coop.rchain.casper.multiparent
 
 import cats.implicits._
 import coop.rchain.casper.helper.TestNode
