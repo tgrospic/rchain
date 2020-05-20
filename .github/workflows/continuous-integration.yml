@@ -86,7 +86,13 @@ jobs:
         #
         # To learn about REMAINDER, see .github/run-unit-test-selection.
         tests:
-          - casper/test
+          - "'casper/test:testOnly coop.rchain.casper.addblock.*'"
+          - "'casper/test:testOnly coop.rchain.casper.api.*'"
+          - "'casper/test:testOnly coop.rchain.casper.batch1.*'"
+          - "'casper/test:testOnly coop.rchain.casper.batch2.*'"
+          - "'casper/test:testOnly coop.rchain.casper.engine.*'"
+          - "'casper/test:testOnly coop.rchain.casper.genesis.*'"
+          - "'casper/test:testOnly coop.rchain.casper.util.*'"
           - REMAINDER # Do not modify/remove!
     env:
       TESTS: ${{ matrix.tests }}
