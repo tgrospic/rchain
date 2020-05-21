@@ -2,7 +2,7 @@ package coop.rchain.casper
 
 import cats.Monad
 import cats.effect.Sync
-import cats.syntax.all._
+import cats.implicits._
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.BlockStore
 import coop.rchain.blockstorage.dag.BlockDagRepresentation
@@ -41,6 +41,12 @@ object BlockCreator {
       isActive         = activeValidators.contains(validator)
     } yield isActive
   }
+
+  private def isBonded[F[_]: Sync](
+      blockMeta: BlockMetadata,
+      validator: Validator
+  ): Boolean =
+    blockMeta.weightMap.exists(s => s._1 == validator && s._2 > 0L) // consider stake greater than 0 as bonded
 
   /*
    * Overview of createBlock
@@ -82,10 +88,16 @@ object BlockCreator {
         latestMessageOpt      <- dag.latestMessage(sender)
         seqNum                = latestMessageOpt.fold(0)(_.seqNum) + 1
         _                     <- Log[F].info(s"Creating block with seqNum ${seqNum}")
+        // if the node is already not bonded by the parent, the node won't slash once more
+        invalidLatestMessagesExcludeUnbonded = invalidLatestMessages.filter(
+          v =>
+            parentMetadatas
+              .map(p => isBonded(p, v._1))
+              .forall(identity)
+        )
         // TODO: Add `slashingDeploys` to DeployStorage
-        slashingDeploys = invalidLatestMessages.values.toList.map(
+        slashingDeploys = invalidLatestMessagesExcludeUnbonded.values.map(
           invalidBlockHash =>
-            // TODO: Do something useful with the result of "slash".
             SlashDeploy(
               invalidBlockHash,
               validatorIdentity.publicKey,
@@ -110,7 +122,7 @@ object BlockCreator {
         invalidBlocksSet <- dag.invalidBlocks
         invalidBlocks    = invalidBlocksSet.map(block => (block.blockHash, block.sender)).toMap
         // make sure closeBlock is the last system Deploy
-        systemDeploys = slashingDeploys :+ CloseBlockDeploy(
+        systemDeploys = slashingDeploys.toList :+ CloseBlockDeploy(
           SystemDeployUtil.generateCloseDeployRandomSeed(sender, seqNum)
         )
         unsignedBlock <- isActive.ifM(
@@ -222,7 +234,7 @@ object BlockCreator {
   )(implicit spanF: Span[F]): F[CreateBlockStatus] =
     spanF.trace(ProcessDeploysAndCreateBlockMetricsSource) {
       (for {
-        blockData <- BlockData(now, maxBlockNumber + 1, sender, seqNum).pure
+        blockData <- BlockData(now, maxBlockNumber + 1, sender, seqNum).pure[F]
         result <- InterpreterUtil.computeDeploysCheckpoint(
                    parents,
                    deploys,
