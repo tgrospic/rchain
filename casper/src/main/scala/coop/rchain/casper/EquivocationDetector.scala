@@ -2,10 +2,9 @@ package coop.rchain.casper
 
 import cats.effect.Sync
 import cats.{Applicative, Monad}
-import cats.implicits._
+import cats.syntax.all._
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.dag.{BlockDagRepresentation, BlockDagStorage, EquivocationsTracker}
-import coop.rchain.blockstorage.BlockStore
 import coop.rchain.casper.protocol.{BlockMessage, Bond}
 import coop.rchain.casper.util.{DagOperations, DoublyLinkedDag, ProtoUtil}
 import coop.rchain.casper.util.ProtoUtil._
@@ -60,7 +59,7 @@ object EquivocationDetector {
     } yield maybeCreatorJustification.latestBlockHash
 
   // See summary of algorithm above
-  def checkNeglectedEquivocationsWithUpdate[F[_]: Sync: BlockStore: BlockDagStorage](
+  def checkNeglectedEquivocationsWithUpdate[F[_]: Sync: BlockDagStorage](
       block: BlockMessage,
       dag: BlockDagRepresentation[F],
       genesis: BlockMessage
@@ -78,12 +77,13 @@ object EquivocationDetector {
       }
     } yield status
 
-  private def isNeglectedEquivocationDetectedWithUpdate[F[_]: Sync: BlockStore: BlockDagStorage](
+  private def isNeglectedEquivocationDetectedWithUpdate[F[_]: Sync: BlockDagStorage](
       block: BlockMessage,
       dag: BlockDagRepresentation[F],
       genesis: BlockMessage
   ): F[Boolean] =
     BlockDagStorage[F].accessEquivocationsTracker { equivocationsTracker =>
+      import cats.instances.list._
       for {
         equivocations <- equivocationsTracker.equivocationRecords
         neglectedEquivocationDetected <- equivocations.toList.existsM { equivocationRecord =>
@@ -104,7 +104,7 @@ object EquivocationDetector {
     *
     * @return Whether a neglected equivocation was discovered.
     */
-  private def updateEquivocationsTracker[F[_]: Sync: BlockStore](
+  private def updateEquivocationsTracker[F[_]: Sync](
       block: BlockMessage,
       dag: BlockDagRepresentation[F],
       equivocationRecord: EquivocationRecord,
@@ -134,7 +134,7 @@ object EquivocationDetector {
           } else ().pure[F]
     } yield neglectedEquivocationDetected
 
-  private def getEquivocationDiscoveryStatus[F[_]: Sync: BlockStore](
+  private def getEquivocationDiscoveryStatus[F[_]: Sync](
       block: BlockMessage,
       dag: BlockDagRepresentation[F],
       equivocationRecord: EquivocationRecord,
@@ -163,7 +163,7 @@ object EquivocationDetector {
     }
   }
 
-  private def getEquivocationDiscoveryStatusForBondedValidator[F[_]: Sync: BlockStore](
+  private def getEquivocationDiscoveryStatusForBondedValidator[F[_]: Sync](
       blockDag: BlockDagRepresentation[F],
       equivocationRecord: EquivocationRecord,
       latestMessages: Map[Validator, BlockHash],
@@ -176,7 +176,7 @@ object EquivocationDetector {
                                    blockDag,
                                    latestMessages.toSeq,
                                    equivocationRecord,
-                                   Set.empty[BlockMessage],
+                                   Set.empty[BlockMetadata],
                                    genesis
                                  )
       } yield
@@ -190,11 +190,11 @@ object EquivocationDetector {
       Applicative[F].pure(EquivocationDetected)
     }
 
-  private def isEquivocationDetectable[F[_]: Sync: BlockStore](
+  private def isEquivocationDetectable[F[_]: Sync](
       blockDag: BlockDagRepresentation[F],
       latestMessages: Seq[(Validator, BlockHash)],
       equivocationRecord: EquivocationRecord,
-      equivocationChildren: Set[BlockMessage],
+      equivocationChildren: Set[BlockMetadata],
       genesis: BlockMessage
   ): F[Boolean] =
     latestMessages match {
@@ -210,11 +210,11 @@ object EquivocationDetector {
         )
     }
 
-  private def isEquivocationDetectableAfterViewingBlock[F[_]: Sync: BlockStore](
+  private def isEquivocationDetectableAfterViewingBlock[F[_]: Sync](
       blockDag: BlockDagRepresentation[F],
       justificationBlockHash: BlockHash,
       equivocationRecord: EquivocationRecord,
-      equivocationChildren: Set[BlockMessage],
+      equivocationChildren: Set[BlockMetadata],
       remainder: Seq[(Validator, BlockHash)],
       genesis: BlockMessage
   ): F[Boolean] =
@@ -222,7 +222,7 @@ object EquivocationDetector {
       true.pure[F]
     } else {
       for {
-        justificationBlock <- ProtoUtil.getBlock[F](justificationBlockHash)
+        justificationBlock <- blockDag.lookup(justificationBlockHash).map(_.get)
         equivocationDetected <- isEquivocationDetectableThroughChildren[F](
                                  blockDag,
                                  equivocationRecord,
@@ -234,12 +234,12 @@ object EquivocationDetector {
       } yield equivocationDetected
     }
 
-  private def isEquivocationDetectableThroughChildren[F[_]: Sync: BlockStore](
+  private def isEquivocationDetectableThroughChildren[F[_]: Sync](
       blockDag: BlockDagRepresentation[F],
       equivocationRecord: EquivocationRecord,
-      equivocationChildren: Set[BlockMessage],
+      equivocationChildren: Set[BlockMetadata],
       remainder: Seq[(Validator, BlockHash)],
-      justificationBlock: BlockMessage,
+      justificationBlock: BlockMetadata,
       genesis: BlockMessage
   ): F[Boolean] = {
     val equivocatingValidator = equivocationRecord.equivocator
@@ -268,17 +268,15 @@ object EquivocationDetector {
     } yield equivocationDetected
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Throw")) // TODO remove throw
-  private def maybeAddEquivocationChild[F[_]: Sync: BlockStore](
+  private def maybeAddEquivocationChild[F[_]: Sync](
       blockDag: BlockDagRepresentation[F],
-      justificationBlock: BlockMessage,
+      justificationBlock: BlockMetadata,
       equivocatingValidator: Validator,
       equivocationBaseBlockSeqNum: SequenceNumber,
-      equivocationChildren: Set[BlockMessage],
+      equivocationChildren: Set[BlockMetadata],
       genesis: BlockMessage
-  ): F[Set[BlockMessage]] =
-    // TODO: Is this a safe check? Or should I just check block hash?
-    if (justificationBlock == genesis) {
+  ): F[Set[BlockMetadata]] =
+    if (justificationBlock.blockHash == genesis.blockHash) {
       equivocationChildren.pure[F]
     } else if (justificationBlock.sender == equivocatingValidator) {
       // This is a special case as the justificationBlock might be the equivocation child
@@ -299,7 +297,7 @@ object EquivocationDetector {
       maybeLatestEquivocatingValidatorBlockHash match {
         case Some(blockHash) =>
           for {
-            latestEquivocatingValidatorBlock <- ProtoUtil.getBlock[F](blockHash)
+            latestEquivocatingValidatorBlock <- blockDag.lookup(blockHash).map(_.get)
             updatedEquivocationChildren <- if (latestEquivocatingValidatorBlock.seqNum > equivocationBaseBlockSeqNum) {
                                             addEquivocationChild[F](
                                               blockDag,
@@ -312,19 +310,18 @@ object EquivocationDetector {
                                           }
           } yield updatedEquivocationChildren
         case None =>
-          throw new Exception(
+          new Exception(
             "justificationBlock is missing justification pointers to equivocatingValidator even though justificationBlock isn't a part of equivocationDetectedBlockHashes for this equivocation record."
-          )
+          ).raiseError[F, Set[BlockMetadata]]
       }
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Throw")) // TODO remove throw
-  private def addEquivocationChild[F[_]: Sync: BlockStore](
+  private def addEquivocationChild[F[_]: Sync](
       blockDag: BlockDagRepresentation[F],
-      justificationBlock: BlockMessage,
+      justificationBlock: BlockMetadata,
       equivocationBaseBlockSeqNum: SequenceNumber,
-      equivocationChildren: Set[BlockMessage]
-  ): F[Set[BlockMessage]] =
+      equivocationChildren: Set[BlockMetadata]
+  ): F[Set[BlockMetadata]] =
     findCreatorJustificationAncestorWithSeqNum[F](
       blockDag,
       justificationBlock,
@@ -332,17 +329,17 @@ object EquivocationDetector {
     ).flatMap {
       case Some(equivocationChildHash) =>
         for {
-          equivocationChild <- ProtoUtil.getBlock[F](equivocationChildHash)
+          equivocationChild <- blockDag.lookup(equivocationChildHash).map(_.get)
         } yield equivocationChildren + equivocationChild
       case None =>
-        throw new Exception(
+        new Exception(
           "creator justification ancestor with lower sequence number hasn't been added to the blockDAG yet."
-        )
+        ).raiseError[F, Set[BlockMetadata]]
     }
 
   private def findCreatorJustificationAncestorWithSeqNum[F[_]: Monad](
       blockDag: BlockDagRepresentation[F],
-      b: BlockMessage,
+      b: BlockMetadata,
       seqNum: SequenceNumber
   ): F[Option[BlockHash]] =
     if (b.seqNum == seqNum) {
