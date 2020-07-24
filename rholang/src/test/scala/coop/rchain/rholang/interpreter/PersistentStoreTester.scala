@@ -6,7 +6,7 @@ import coop.rchain.metrics
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.rholang.interpreter.Runtime.RhoISpace
-import coop.rchain.rholang.interpreter.accounting.{Cost, CostAccounting}
+import coop.rchain.rholang.interpreter.accounting.Cost
 import coop.rchain.rspace.RSpace
 import coop.rchain.rspace.history.Branch
 import coop.rchain.shared.Log

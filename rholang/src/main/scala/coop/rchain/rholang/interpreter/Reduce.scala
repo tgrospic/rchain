@@ -2,7 +2,7 @@ package coop.rchain.rholang.interpreter
 
 import cats.effect.Sync
 import cats.implicits._
-import cats.{Eval => _}
+import cats.{Parallel, Eval => _}
 import com.google.protobuf.ByteString
 import coop.rchain.crypto.codec.Base16
 import coop.rchain.crypto.hash.Blake2b512Random
@@ -13,6 +13,7 @@ import coop.rchain.models.Var.VarInstance.{BoundVar, FreeVar, Wildcard}
 import coop.rchain.models.rholang.implicits._
 import coop.rchain.models.serialization.implicits._
 import coop.rchain.models.{Match, MatchCase, _}
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.Runtime.{RhoDispatch, RhoTuplespace}
 import coop.rchain.rholang.interpreter.Substitute.{charge => _, _}
 import coop.rchain.rholang.interpreter.accounting._
@@ -40,15 +41,12 @@ trait Reduce[M[_]] {
 
 }
 
-class DebruijnInterpreter[M[_]](
+class DebruijnInterpreter[M[_]: Sync: Parallel: CostStateRef](
     space: RhoTuplespace[M],
     dispatcher: => RhoDispatch[M],
     urnMap: Map[String, Par]
-)(
-    implicit parallel: cats.Parallel[M],
-    syncM: Sync[M],
-    cost: _cost[M]
 ) extends Reduce[M] {
+  val syncM = Sync[M]
 
   type Application =
     Option[

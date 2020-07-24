@@ -1,6 +1,6 @@
 package coop.rchain.rspace.bench
 
-import coop.rchain.rholang.interpreter.{ParBuilderUtil, Runtime}
+import coop.rchain.rholang.interpreter.{CostAccounting, ParBuilderUtil, Runtime}
 import java.nio.file.{Files, Path}
 
 import coop.rchain.catscontrib.TaskContrib._
@@ -8,6 +8,7 @@ import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.metrics
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.Par
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.shared.Log
 import monix.eval.{Coeval, Task}
@@ -54,7 +55,7 @@ abstract class RhoBenchBaseState {
       cost <- CostAccounting.emptyCost[Task]
       sar  <- Runtime.setupRSpace[Task](dbDir, mapSize)
       runtime <- {
-        implicit val c: _cost[Task] = cost
+        implicit val c: CostStateRef[Task] = cost
         Runtime.create[Task]((sar._1, sar._2))
       }
     } yield (runtime)).unsafeRunSync

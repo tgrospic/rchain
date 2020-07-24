@@ -1,28 +1,60 @@
 package coop.rchain.rholang.interpreter.matcher
 
-import cats._
 import cats.data._
 import cats.effect._
-import cats.effect.implicits._
-import cats.implicits._
+import cats.effect.concurrent.Ref
+import cats.instances.list._
+import cats.instances.stream._
 import cats.mtl.implicits._
-import cats.{Alternative, Foldable, Functor, MonoidK, SemigroupK}
-
-import coop.rchain.catscontrib.mtl.implicits._
+import cats.syntax.all._
+import cats.{Alternative, Foldable, MonoidK, SemigroupK, _}
 import coop.rchain.catscontrib.TaskContrib._
 import coop.rchain.metrics.Metrics
 import coop.rchain.models.Par
+import coop.rchain.rholang.interpreter.CostAccounting.{CostState, CostStateRef}
 import coop.rchain.rholang.interpreter._
 import coop.rchain.rholang.interpreter.accounting._
-import coop.rchain.rholang.interpreter.accounting.CostAccounting._
 import coop.rchain.rholang.interpreter.errors.OutOfPhlogistonsError
-import coop.rchain.rholang.interpreter.matcher.{run => runMatcher, _}
-
-import org.scalatest._
+import coop.rchain.rholang.interpreter.matcher.{run => runMatcher}
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
+import org.scalatest._
+
+object MatcherMonadHelper {
+  type CostStateMonad[F[_]] = CostStateRef[F] with Monad[F]
+
+  implicit def ntCostLog[F[_]: Monad: CostStateRef, G[_]: Sync](
+      nt: F ~> G
+  ): CostStateMonad[G] = {
+    val C = CostStateRef[F]
+    val M = Monad[G]
+    new Ref[G, CostState] with Monad[G] {
+      override def get: G[CostState]                     = nt(C.get)
+      override def set(a: CostState): G[Unit]            = nt(C.set(a))
+      override def getAndSet(a: CostState): G[CostState] = nt(C.getAndSet(a))
+      override def access: G[(CostState, CostState => G[Boolean])] =
+        nt(C.access.map { case (s, f) => (s, x => nt(f(x))) })
+      override def tryUpdate(f: CostState => CostState): G[Boolean]           = nt(C.tryUpdate(f))
+      override def tryModify[B](f: CostState => (CostState, B)): G[Option[B]] = nt(C.tryModify(f))
+      override def update(f: CostState => CostState): G[Unit]                 = nt(C.update(f))
+      override def modify[B](f: CostState => (CostState, B)): G[B]            = nt(C.modify(f))
+      override def tryModifyState[B](state: State[CostState, B]): G[Option[B]] =
+        nt(C.tryModifyState(state))
+      override def modifyState[B](state: State[CostState, B]): G[B] = nt(C.modifyState(state))
+
+      override def pure[A](x: A): G[A]                                 = M.pure(x)
+      override def flatMap[A, B](fa: G[A])(f: A => G[B]): G[B]         = M.flatMap(fa)(f)
+      override def tailRecM[A, B](a: A)(f: A => G[Either[A, B]]): G[B] = M.tailRecM(a)(f)
+    }
+  }
+
+  def matcherMonadCostLog[F[_]: Sync: CostStateRef](): CostStateMonad[MatcherMonadT[F, ?]] =
+    λ[F ~> MatcherMonadT[F, ?]](fa => StateT.liftF(StreamT.liftF(fa)))
+}
 
 class MatcherMonadSpec extends FlatSpec with Matchers {
+  import MatcherMonadHelper._
+
   implicit val metrics: Metrics[Task] = new Metrics.MetricsNOP[Task]
   implicit val ms: Metrics.Source     = Metrics.BaseSource
 
@@ -30,10 +62,8 @@ class MatcherMonadSpec extends FlatSpec with Matchers {
 
   val A: Alternative[F] = Alternative[F]
 
-  implicit val cost = CostAccounting.emptyCost[Task].unsafeRunSync
-
-  implicit val costF: _cost[F]   = matcherMonadCostLog[Task]
-  implicit val matcherMonadError = implicitly[Sync[F]]
+  implicit val cost: CostStateRef[Task] = CostAccounting.emptyCost[Task].unsafeRunSync
+  implicit val costF: CostStateMonad[F] = matcherMonadCostLog[Task]
 
   private def combineK[FF[_]: MonoidK, G[_]: Foldable, A](gfa: G[FF[A]]): FF[A] =
     gfa.foldLeft(MonoidK[FF].empty[A])(SemigroupK[FF].combineK[A])
@@ -42,7 +72,7 @@ class MatcherMonadSpec extends FlatSpec with Matchers {
     (for {
       _        <- cost.set(Cost(phlo, "initial cost"))
       result   <- f
-      phloLeft <- cost.get
+      phloLeft <- cost.current
     } yield (phloLeft, result)).unsafeRunSync
 
   behavior of "MatcherMonad"
@@ -64,7 +94,7 @@ class MatcherMonadSpec extends FlatSpec with Matchers {
 
   val modifyStates = for {
     _ <- _freeMap[F].set(Map(42 -> Par()))
-    _ <- costF.modify(_ + Cost(1))
+    _ <- costF <+ Cost(1)
   } yield ()
 
   it should "retain cost and matches when attemptOpt is called on successful match" in {
@@ -120,7 +150,7 @@ class MatcherMonadSpec extends FlatSpec with Matchers {
 
   it should "fail all branches when using `_error[F].raise`" in {
     val a: F[Int] = 1.pure[F]
-    val b: F[Int] = 2.pure[F] >> _error[F].raiseError[Int](OutOfPhlogistonsError)
+    val b: F[Int] = 2.pure[F] >> Sync[F].raiseError[Int](OutOfPhlogistonsError)
     val c: F[Int] = 3.pure[F]
 
     val combined = combineK(List(a, b, c))

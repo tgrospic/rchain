@@ -8,6 +8,7 @@ import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.Expr.ExprInstance._
 import coop.rchain.models._
 import coop.rchain.models.rholang.implicits._
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.Runtime.RhoTuplespace
 import coop.rchain.rholang.interpreter._
 import coop.rchain.rholang.interpreter.accounting.Chargeable._
@@ -766,9 +767,8 @@ class RholangMethodsCostsSpec
   def methodCall(method: String, target: Par, arguments: List[Par]): Expr =
     EMethod(method, target, arguments)
 
-  def methodCallCost(reducer: Reduce[Task])(implicit cost: _cost[Task]): Task[Cost] =
-    cost.get
-      .map(balance => Cost.UNSAFE_MAX - balance - METHOD_CALL_COST)
+  def methodCallCost(reducer: Reduce[Task])(implicit cost: CostStateRef[Task]): Task[Cost] =
+    cost.current.map(balance => Cost.UNSAFE_MAX - balance - METHOD_CALL_COST)
 
   def map(pairs: Seq[(Par, Par)]): Map[Par, Par] = Map(pairs: _*)
   def emptyMap: Map[Par, Par]                    = map(Seq.empty[(Par, Par)])
@@ -810,7 +810,7 @@ class RholangMethodsCostsSpec
   }
   def withReducer[R](
       f: DebruijnInterpreter[Task] => Task[R]
-  )(implicit cost: _cost[Task]): R = {
+  )(implicit cost: CostStateRef[Task]): R = {
 
     val test = for {
       _   <- cost.set(Cost.UNSAFE_MAX)
