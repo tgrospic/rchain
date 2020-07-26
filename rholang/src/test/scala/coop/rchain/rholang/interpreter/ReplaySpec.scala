@@ -1,13 +1,15 @@
 package coop.rchain.rholang.interpreter
 
 import cats.effect.Resource
+import cats.effect.concurrent.Ref
 import cats.syntax.all._
 import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.metrics
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.rholang.Resources
+import coop.rchain.rholang.interpreter.CostAccounting.{CostState, CostStateRef}
 import coop.rchain.rholang.interpreter.accounting.utils.costLog
-import coop.rchain.rholang.interpreter.accounting.{_cost, Cost, CostAccounting}
+import coop.rchain.rholang.interpreter.accounting.Cost
 import coop.rchain.rspace.SoftCheckpoint
 import coop.rchain.shared.Log
 import monix.eval.Task
@@ -67,7 +69,7 @@ class ReplaySpec extends FlatSpec with Matchers {
     }.runSyncUnsafe(timeout)
 
   def evaluateWithRuntime(runtime: Runtime[Task])(term: String, initialPhlo: Cost) = {
-    implicit val c: _cost[Task]         = runtime.cost
+    implicit val c: CostStateRef[Task]  = runtime.cost
     implicit def rand: Blake2b512Random = Blake2b512Random(Array.empty[Byte])
     for {
       // Save revert checkpoints
@@ -120,15 +122,14 @@ class ReplaySpec extends FlatSpec with Matchers {
     implicit val logF: Log[Task]           = new Log.NOPLog[Task]
     implicit val metricsEff: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
     implicit val noopSpan: Span[Task]      = NoopSpan[Task]()
-    implicit val ms: Metrics.Source        = Metrics.BaseSource
 
     val resources = for {
       dir     <- Resources.mkTempDir[Task]("cost-accounting-spec-")
       costLog <- Resource.liftF(costLog[Task]())
-      cost    <- Resource.liftF(CostAccounting.emptyCost[Task](implicitly, metricsEff, costLog, ms))
+      cost    <- Resource.liftF(CostAccounting.emptyCost[Task])
       sar     <- Resource.liftF(Runtime.setupRSpace[Task](dir, 1024L * 1024 * 1024))
       runtime <- {
-        implicit val c: _cost[Task] = cost
+        implicit val c: CostStateRef[Task] = cost
         Resource.make(Runtime.create[Task]((sar._1, sar._2), Nil))(_.close())
       }
     } yield (runtime, costLog)

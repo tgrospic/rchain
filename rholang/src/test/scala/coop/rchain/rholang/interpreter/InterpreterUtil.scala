@@ -2,20 +2,24 @@ package coop.rchain.rholang.interpreter
 
 import cats.effect.Sync
 import cats.implicits._
-import coop.rchain.rholang.interpreter.accounting.{_cost, Cost}
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
+import coop.rchain.rholang.interpreter.accounting.Cost
 import org.scalatest.Matchers._
 
 object InterpreterUtil {
-  def evaluateResult[F[_]: Sync: _cost](
+  def evaluateResult[F[_]: Sync: CostStateRef](
       runtime: Runtime[F],
       term: String,
       initialPhlo: Cost
   ): F[EvaluateResult] = Interpreter[F].evaluate(runtime, term, initialPhlo, Map.empty)
 
-  def evaluateResult[F[_]: Sync: _cost](runtime: Runtime[F], term: String): F[EvaluateResult] =
+  def evaluateResult[F[_]: Sync: CostStateRef](
+      runtime: Runtime[F],
+      term: String
+  ): F[EvaluateResult] =
     Interpreter[F].evaluate(runtime, term, Map.empty)
 
-  def evaluate[F[_]: Sync: _cost](runtime: Runtime[F], term: String)(
+  def evaluate[F[_]: Sync: CostStateRef](runtime: Runtime[F], term: String)(
       implicit line: sourcecode.Line,
       file: sourcecode.File
   ): F[Unit] =

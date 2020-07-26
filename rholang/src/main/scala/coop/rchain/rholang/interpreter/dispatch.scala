@@ -7,6 +7,7 @@ import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.metrics.Span
 import coop.rchain.models.TaggedContinuation.TaggedCont.{Empty, ParBody, ScalaBodyRef}
 import coop.rchain.models._
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.Runtime.RhoTuplespace
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rholang.interpreter.errors.InterpreterError
@@ -51,15 +52,10 @@ class RholangAndScalaDispatcher[M[_]] private (
 
 object RholangAndScalaDispatcher {
 
-  def create[M[_], F[_]](
+  def create[M[_]: Sync: Parallel: CostStateRef, F[_]](
       tuplespace: RhoTuplespace[M],
       dispatchTable: => Map[Long, Seq[ListParWithRandom] => M[Unit]],
       urnMap: Map[String, Par]
-  )(
-      implicit
-      cost: _cost[M],
-      parallel: Parallel[M],
-      s: Sync[M]
   ): (Dispatch[M, ListParWithRandom, TaggedContinuation], Reduce[M]) = {
 
     implicit lazy val dispatcher: Dispatch[M, ListParWithRandom, TaggedContinuation] =

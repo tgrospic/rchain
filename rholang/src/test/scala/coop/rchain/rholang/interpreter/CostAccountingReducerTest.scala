@@ -42,7 +42,7 @@ class CostAccountingReducerTest extends FlatSpec with Matchers with TripleEquals
         Substitute.charge(Task.now(substTerm), Cost(10000)).attempt
       }
       _         = assert(res === Right(substTerm))
-      finalCost <- cost.get
+      finalCost <- cost.current
       _         = assert(finalCost === (initCost - Cost(termCost)))
     } yield ()).runSyncUnsafe(5.seconds)
   }
@@ -62,7 +62,7 @@ class CostAccountingReducerTest extends FlatSpec with Matchers with TripleEquals
           .attempt
       }
       _         = assert(res.isLeft)
-      finalCost <- cost.get
+      finalCost <- cost.current
       _         = assert(finalCost === (initCost - Cost(originalTermCost)))
     } yield ()).runSyncUnsafe(5.seconds)
   }

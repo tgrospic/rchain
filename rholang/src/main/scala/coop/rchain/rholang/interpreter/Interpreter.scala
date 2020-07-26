@@ -4,6 +4,7 @@ import cats.effect._
 import cats.implicits._
 import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.models.Par
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rholang.interpreter.errors.{
   AggregateError,
@@ -43,10 +44,7 @@ object Interpreter {
 
   def apply[F[_]](implicit interpreter: Interpreter[F]): Interpreter[F] = interpreter
 
-  implicit def interpreter[F[_]](
-      implicit S: Sync[F],
-      C: _cost[F]
-  ): Interpreter[F] =
+  implicit def interpreter[F[_]: Sync: CostStateRef]: Interpreter[F] =
     new Interpreter[F] {
 
       def evaluate(
@@ -87,7 +85,7 @@ object Interpreter {
       )(implicit rand: Blake2b512Random): F[EvaluateResult] = {
         val parsingCost = accounting.parsingCost(term)
         val evaluationResult = for {
-          _ <- C.set(initialPhlo)
+          _ <- CostStateRef[F].set(initialPhlo)
           _ <- charge[F](parsingCost)
           parsed <- ParBuilder[F]
                      .buildNormalizedTerm(term, normalizerEnv)
@@ -95,14 +93,14 @@ object Interpreter {
                        case err: InterpreterError => ParserError(err).raiseError[F, Par]
                      }
           _         <- reducer.inj(parsed)
-          phlosLeft <- C.get
+          phlosLeft <- CostStateRef[F].current
         } yield EvaluateResult(initialPhlo - phlosLeft, Vector())
 
         // Convert InterpreterError(s) to EvaluateResult
         // - all other errors are rethrown (not valid interpreter errors)
         evaluationResult.handleErrorWith(
           error =>
-            C.get >>= (
+            CostStateRef[F].get.map(_.total) >>= (
                 phlosLeft => handleError(initialPhlo, parsingCost, initialPhlo - phlosLeft, error)
             )
         )

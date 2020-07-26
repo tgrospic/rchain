@@ -31,6 +31,7 @@ import coop.rchain.models.Expr.ExprInstance.{EVarBody, GString}
 import coop.rchain.models.Validator.Validator
 import coop.rchain.models.Var.VarInstance.FreeVar
 import coop.rchain.models._
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.Runtime.BlockData
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rholang.interpreter.errors.BugFoundError
@@ -102,7 +103,7 @@ class RuntimeManagerImpl[F[_]: Concurrent: Metrics: Span: Log](
   private def evaluateSystemSource[S <: SystemDeploy](
       runtime: Runtime[F]
   )(systemDeploy: S, replay: Boolean): F[EvaluateResult] = {
-    implicit val c: _cost[F]         = runtime.cost
+    implicit val c: CostStateRef[F]  = runtime.cost
     implicit val r: Blake2b512Random = systemDeploy.rand
     Interpreter[F].injAttempt(
       if (replay) runtime.replayReducer else runtime.reducer,
@@ -866,13 +867,14 @@ object RuntimeManager {
 
   def evaluate[F[_]: Sync](
       reducer: Reduce[F],
-      costState: _cost[F]
+      cost: CostStateRef[F]
   )(deploy: Signed[DeployData]): F[EvaluateResult] = {
     import coop.rchain.models.rholang.implicits._
 
     implicit val rand: Blake2b512Random =
       Tools.unforgeableNameRng(deploy.pk, deploy.data.timestamp)
-    implicit val cost: _cost[F] = costState
+
+    implicit val c: CostStateRef[F] = cost
 
     Interpreter[F].injAttempt(
       reducer,

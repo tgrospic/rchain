@@ -18,8 +18,9 @@ import coop.rchain.models.Var.VarInstance.FreeVar
 import coop.rchain.models._
 import coop.rchain.models.rholang.implicits._
 import coop.rchain.rholang.RholangMetricsSource
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.Runtime._
-import coop.rchain.rholang.interpreter.accounting.{noOpCostLog, _}
+import coop.rchain.rholang.interpreter.accounting.Cost
 import coop.rchain.rholang.interpreter.registry.RegistryBootstrap
 import coop.rchain.rholang.interpreter.storage.ChargingRSpace
 import coop.rchain.rspace.history.HistoryRepository
@@ -33,7 +34,7 @@ class Runtime[F[_]: Sync] private (
     val replayReducer: Reduce[F],
     val space: RhoISpace[F],
     val replaySpace: RhoReplayISpace[F],
-    val cost: _cost[F],
+    val cost: CostStateRef[F],
     val blockData: Ref[F, BlockData],
     val invalidBlocks: InvalidBlocks[F]
 ) extends HasCost[F] {
@@ -45,7 +46,7 @@ class Runtime[F[_]: Sync] private (
 }
 
 trait HasCost[F[_]] {
-  def cost: _cost[F]
+  def cost: CostStateRef[F]
 }
 
 object Runtime {
@@ -155,7 +156,7 @@ object Runtime {
     val SYS_AUTHTOKEN_OPS: Par  = byteName(18)
   }
 
-  def introduceSystemProcesses[F[_]: Sync: _cost: Span](
+  def introduceSystemProcesses[F[_]: Sync: Span](
       spaces: List[RhoTuplespace[F]],
       processes: List[(Name, Arity, Remainder, BodyRef)]
   ): F[List[Option[(TaggedContinuation, Seq[ListParWithRandom])]]] =
@@ -283,12 +284,9 @@ object Runtime {
     createWithEmptyCost_(spaceAndReplay, extraSystemProcesses)
   }
 
-  private def createWithEmptyCost_[F[_]: Concurrent: Log: Metrics: Span](
+  private def createWithEmptyCost_[F[_]: Concurrent: Parallel: Log: Metrics: Span](
       spaceAndReplay: ISpaceAndReplay[F],
       extraSystemProcesses: Seq[SystemProcess.Definition[F]]
-  )(
-      implicit
-      P: Parallel[F]
   ): F[Runtime[F]] =
     for {
       cost <- CostAccounting.emptyCost[F]
@@ -345,13 +343,13 @@ object Runtime {
     )
   }
 
-  def setupReducer[F[_]: Concurrent: Log: Metrics: Span](
+  def setupReducer[F[_]: Concurrent: Parallel: CostStateRef: Log: Metrics: Span](
       chargingRSpace: RhoTuplespace[F],
       blockDataRef: Ref[F, BlockData],
       invalidBlocks: InvalidBlocks[F],
       extraSystemProcesses: Seq[SystemProcess.Definition[F]],
       urnMap: Map[String, Par]
-  )(implicit cost: _cost[F], P: Parallel[F]): Reduce[F] = {
+  ): Reduce[F] = {
     lazy val replayDispatchTable: RhoDispatchMap[F] =
       dispatchTableCreator(
         chargingRSpace,
@@ -381,12 +379,9 @@ object Runtime {
         .map(_.toProcDefs)
     } yield (blockDataRef, invalidBlocks, urnMap, procDefs)
 
-  def create[F[_]: Concurrent: Log: Metrics: Span](
+  def create[F[_]: Concurrent: Parallel: CostStateRef: Log: Metrics: Span](
       spaceAndReplay: ISpaceAndReplay[F],
       extraSystemProcesses: Seq[SystemProcess.Definition[F]] = Seq.empty
-  )(
-      implicit P: Parallel[F],
-      cost: _cost[F]
   ): F[Runtime[F]] = {
     val (space, replaySpace) = spaceAndReplay
     for {
@@ -420,7 +415,7 @@ object Runtime {
         replayReducer,
         space,
         replaySpace,
-        cost,
+        CostStateRef[F],
         blockDataRef,
         invalidBlocks
       )

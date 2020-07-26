@@ -7,17 +7,16 @@ import cats.mtl.FunctorTell
 import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.models.TaggedContinuation.TaggedCont.{Empty, ParBody, ScalaBodyRef}
 import coop.rchain.models._
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.Runtime.RhoTuplespace
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rholang.interpreter.errors.InterpreterError
 
 object RholangOnlyDispatcher {
 
-  def create[M[_], F[_]](tuplespace: RhoTuplespace[M], urnMap: Map[String, Par] = Map.empty)(
-      implicit
-      cost: _cost[M],
-      parallel: Parallel[M],
-      s: Sync[M]
+  def create[M[_]: Sync: Parallel: CostStateRef, F[_]](
+      tuplespace: RhoTuplespace[M],
+      urnMap: Map[String, Par] = Map.empty
   ): (Dispatch[M, ListParWithRandom, TaggedContinuation], DebruijnInterpreter[M]) = {
 
     lazy val dispatcher: Dispatch[M, ListParWithRandom, TaggedContinuation] =

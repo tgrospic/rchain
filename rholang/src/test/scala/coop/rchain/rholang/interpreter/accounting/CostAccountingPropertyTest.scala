@@ -2,11 +2,13 @@ package coop.rchain.rholang.interpreter.accounting
 
 import cats._
 import cats.effect._
+import cats.effect.concurrent.Ref
 import cats.implicits._
 import coop.rchain.metrics
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models._
 import coop.rchain.rholang.Resources._
+import coop.rchain.rholang.interpreter.CostAccounting.{CostState, CostStateRef}
 import coop.rchain.rholang.interpreter.{PrettyPrinter => PP, _}
 import coop.rchain.rholang.syntax.rholang_mercury.Absyn.{PPar, Proc}
 import coop.rchain.rholang.syntax.rholang_mercury.PrettyPrinter
@@ -80,14 +82,14 @@ object CostAccountingPropertyTest {
       .map { _.sliding(2).forall { case List(r1, r2) => r1 == r2 } }
       .runSyncUnsafe(duration)
 
-  def execute[F[_]: Sync: _cost](runtime: Runtime[F], p: Proc): F[Long] =
+  def execute[F[_]: Sync: CostStateRef](runtime: Runtime[F], p: Proc): F[Long] =
     for {
       program <- ParBuilderUtil.buildPar(p)
       res     <- evaluatePar(runtime, program)
       cost    = res.cost
     } yield cost.value
 
-  def evaluatePar[F[_]: Monad: Sync: _cost](
+  def evaluatePar[F[_]: Monad: Sync: CostStateRef](
       runtime: Runtime[F],
       par: Par
   ): F[EvaluateResult] = {
@@ -100,7 +102,6 @@ object CostAccountingPropertyTest {
     implicit val logF: Log[Task]            = new Log.NOPLog[Task]
     implicit val noopMetrics: Metrics[Task] = new metrics.Metrics.MetricsNOP[Task]
     implicit val noopSpan: Span[Task]       = NoopSpan[Task]()
-    implicit val ms: Metrics.Source         = Metrics.BaseSource
 
     val prefix = "cost-accounting-property-test"
     mkRuntime[Task](prefix, 1024 * 1024 * 1024L).use { runtime =>

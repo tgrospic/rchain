@@ -50,9 +50,11 @@ import coop.rchain.rholang.interpreter.Runtime.{
   RhoHistoryRepository,
   SystemProcess
 }
-import coop.rchain.rholang.interpreter.accounting.{_cost, Cost, CostAccounting}
+import coop.rchain.rholang.interpreter.accounting.Cost
+import coop.rchain.rholang.interpreter.CostAccounting.CostStateRef
 import coop.rchain.rholang.interpreter.storage._
 import coop.rchain.rholang.interpreter.{
+  CostAccounting,
   EvaluateResult,
   HasCost,
   Interpreter,
@@ -484,7 +486,7 @@ object ReportingCasper {
     private def evaluateSystemSource[S <: SystemDeploy](
         runtime: ReportingRuntime[F]
     )(systemDeploy: S, replay: Boolean): F[EvaluateResult] = {
-      implicit val c: _cost[F]         = runtime.cost
+      implicit val c: CostStateRef[F]  = runtime.cost
       implicit val r: Blake2b512Random = systemDeploy.rand
       Interpreter[F].injAttempt(
         runtime.replayReducer,
@@ -504,7 +506,7 @@ object ReportingCasper {
 class ReportingRuntime[F[_]: Sync](
     val replayReducer: Reduce[F],
     val reportingSpace: RhoReportingRspace[F],
-    val cost: _cost[F],
+    val cost: CostStateRef[F],
     val blockData: Ref[F, BlockData],
     val invalidBlocks: Runtime.InvalidBlocks[F]
 ) extends HasCost[F] {
@@ -521,8 +523,7 @@ object ReportingRuntime {
   def createWithEmptyCost[F[_]: Concurrent: Log: Metrics: Span: Parallel](
       reporting: RhoReportingRspace[F],
       extraSystemProcesses: Seq[SystemProcess.Definition[F]] = Seq.empty
-  ): F[ReportingRuntime[F]] = {
-    implicit val P = Parallel[F]
+  ): F[ReportingRuntime[F]] =
     for {
       cost <- CostAccounting.emptyCost[F]
       runtime <- {
@@ -530,14 +531,10 @@ object ReportingRuntime {
         create(reporting, extraSystemProcesses)
       }
     } yield runtime
-  }
 
-  def create[F[_]: Concurrent: Log: Metrics: Span, M[_]](
+  def create[F[_]: Concurrent: Parallel: CostStateRef: Log: Metrics: Span, M[_]](
       reporting: RhoReportingRspace[F],
       extraSystemProcesses: Seq[SystemProcess.Definition[F]] = Seq.empty
-  )(
-      implicit P: Parallel[F],
-      cost: _cost[F]
   ): F[ReportingRuntime[F]] =
     for {
       mapsAndRefs                                     <- setupMapsAndRefs(extraSystemProcesses)
@@ -552,6 +549,12 @@ object ReportingRuntime {
       res <- Runtime.introduceSystemProcesses(reporting :: Nil, procDefs)
     } yield {
       assert(res.forall(_.isEmpty))
-      new ReportingRuntime[F](reducer, reporting, cost, blockDataRef, invalidBlocks)
+      new ReportingRuntime[F](
+        reducer,
+        reporting,
+        CostStateRef[F],
+        blockDataRef,
+        invalidBlocks
+      )
     }
 }
