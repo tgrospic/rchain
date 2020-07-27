@@ -209,6 +209,7 @@ object HistoryRepositoryImpl {
         bv => codecSeqByteVector.decode(bv.bits).get.value.map(v => codec.decode(v.bits).get.value)
       )
 
+  // Touch
   def encodeJoins[C](joins: Seq[Seq[C]])(implicit codec: Codec[C]): ByteVector =
     codecSeqByteVector
       .encode(
