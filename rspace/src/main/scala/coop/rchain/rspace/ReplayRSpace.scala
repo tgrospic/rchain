@@ -11,7 +11,7 @@ import cats.implicits._
 import coop.rchain.catscontrib._
 import coop.rchain.metrics.{Metrics, Span}
 import coop.rchain.metrics.implicits._
-import coop.rchain.rspace.history.{Branch, HistoryRepository}
+import coop.rchain.rspace.history.HistoryRepository
 import coop.rchain.rspace.internal._
 import coop.rchain.rspace.trace.{Produce, _}
 import coop.rchain.shared.{Log, Serialize}
@@ -22,8 +22,7 @@ import monix.execution.atomic.AtomicAny
 
 class ReplayRSpace[F[_]: Sync, C, P, A, K](
     historyRepository: HistoryRepository[F, C, P, A, K],
-    storeAtom: AtomicAny[HotStore[F, C, P, A, K]],
-    branch: Branch
+    storeAtom: AtomicAny[HotStore[F, C, P, A, K]]
 )(
     implicit
     serializeC: Serialize[C],
@@ -37,7 +36,7 @@ class ReplayRSpace[F[_]: Sync, C, P, A, K](
     scheduler: ExecutionContext,
     metricsF: Metrics[F],
     val spanF: Span[F]
-) extends RSpaceOps[F, C, P, A, K](historyRepository, storeAtom, branch)
+) extends RSpaceOps[F, C, P, A, K](historyRepository, storeAtom)
     with IReplaySpace[F, C, P, A, K] {
 
   protected[this] override val logger: Logger = Logger[this.type]
@@ -321,8 +320,7 @@ object ReplayRSpace {
 
   def create[F[_], C, P, A, K](
       historyRepository: HistoryRepository[F, C, P, A, K],
-      store: HotStore[F, C, P, A, K],
-      branch: Branch
+      store: HotStore[F, C, P, A, K]
   )(
       implicit
       sc: Serialize[C],
@@ -339,15 +337,14 @@ object ReplayRSpace {
   ): F[ReplayRSpace[F, C, P, A, K]] = {
 
     val space: ReplayRSpace[F, C, P, A, K] =
-      new ReplayRSpace[F, C, P, A, K](historyRepository, AtomicAny(store), branch)
+      new ReplayRSpace[F, C, P, A, K](historyRepository, AtomicAny(store))
 
     space.pure[F]
   }
 
   def create[F[_], C, P, A, K](
       dataDir: Path,
-      mapSize: Long,
-      branch: Branch
+      mapSize: Long
   )(
       implicit
       sc: Serialize[C],
@@ -363,8 +360,8 @@ object ReplayRSpace {
       spanF: Span[F],
       par: Parallel[F]
   ): F[IReplaySpace[F, C, P, A, K]] =
-    RSpace.setUp[F, C, P, A, K](dataDir, mapSize, branch).map {
+    RSpace.setUp[F, C, P, A, K](dataDir, mapSize).map {
       case (historyReader, store) =>
-        new ReplayRSpace[F, C, P, A, K](historyReader, AtomicAny(store), branch)
+        new ReplayRSpace[F, C, P, A, K](historyReader, AtomicAny(store))
     }
 }

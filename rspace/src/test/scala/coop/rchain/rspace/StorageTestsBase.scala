@@ -64,11 +64,9 @@ trait StorageTestsBase[F[_], C, P, A, K] extends FlatSpec with Matchers with Opt
   def run[S](f: F[S]): S
 
   protected def setupTestingSpace[S, STORE](
-      createISpace: (HR, ST, Branch) => F[(ST, AtST, T)],
+      createISpace: (HR, ST) => F[(ST, AtST, T)],
       f: (ST, AtST, T) => F[S]
   )(implicit codecC: Codec[C], codecP: Codec[P], codecA: Codec[A], codecK: Codec[K]): S = {
-    val branch = Branch("inmem")
-
     val dbDir: Path   = Files.createTempDirectory("rchain-storage-test-")
     val mapSize: Long = 1024L * 1024L * 1024L
 
@@ -91,7 +89,7 @@ trait StorageTestsBase[F[_], C, P, A, K] extends FlatSpec with Matchers with Opt
       historyRepository    <- HistoryRepositoryInstances.lmdbRepository[F, C, P, A, K](config)
       cache                <- Ref.of[F, Cache[C, P, A, K]](Cache[C, P, A, K]())
       testStore            = HotStore.inMem[F, C, P, A, K](Sync[F], cache, historyRepository, codecK)
-      spaceAndStore        <- createISpace(historyRepository, testStore, branch)
+      spaceAndStore        <- createISpace(historyRepository, testStore)
       (store, atom, space) = spaceAndStore
       res                  <- f(store, atom, space)
       _                    <- Sync[F].delay(dbDir.recursivelyDelete())
@@ -141,11 +139,11 @@ abstract class InMemoryHotStoreTestsBase[F[_]]
     StringExamples.implicits.stringClosureSerialize.toCodec
 
   override def fixture[S](f: (ST, AtST, T) => F[S]): S = {
-    val creator: (HR, ST, Branch) => F[(ST, AtST, T)] =
-      (hr, ts, b) => {
+    val creator: (HR, ST) => F[(ST, AtST, T)] =
+      (hr, ts) => {
         val atomicStore = AtomicAny(ts)
         val space =
-          new RSpace[F, String, Pattern, String, StringsCaptor](hr, atomicStore, b)
+          new RSpace[F, String, Pattern, String, StringsCaptor](hr, atomicStore)
         Applicative[F].pure((ts, atomicStore, space))
       }
     setupTestingSpace(creator, f)

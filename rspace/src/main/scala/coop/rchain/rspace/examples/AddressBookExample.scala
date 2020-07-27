@@ -7,7 +7,6 @@ import cats.{Applicative, Id, Parallel}
 import cats.effect.{Concurrent, ContextShift}
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.rspace.ISpace.IdISpace
-import coop.rchain.rspace.history.Branch
 import coop.rchain.rspace._
 import coop.rchain.rspace.{RSpace, ReplayRSpace}
 import coop.rchain.shared.Language.ignore
@@ -210,8 +209,7 @@ object AddressBookExample {
     val space =
       RSpace.create[Id, Channel, Pattern, Entry, Printer](
         storePath,
-        1024L * 1024L,
-        Branch.MASTER
+        1024L * 1024L
       )
 
     Console.printf("\nExample One: Let's consume and then produce...\n")
@@ -251,8 +249,7 @@ object AddressBookExample {
     val space =
       RSpace.create[Id, Channel, Pattern, Entry, Printer](
         storePath,
-        1024L * 1024L,
-        Branch.MASTER
+        1024L * 1024L
       )
 
     Console.printf("\nExample Two: Let's produce and then consume...\n")
@@ -344,8 +341,7 @@ object AddressBookExample {
     val space =
       RSpace.create[Id, Channel, Pattern, Entry, Printer](
         storePath,
-        1024L * 1024L,
-        Branch.MASTER
+        1024L * 1024L
       )
     try {
       f(space)

@@ -12,7 +12,7 @@ import coop.rchain.catscontrib._
 import coop.rchain.metrics.{Metrics, Span}
 import coop.rchain.metrics.Metrics.Source
 import coop.rchain.metrics.implicits._
-import coop.rchain.rspace.history.{Branch, HistoryRepository}
+import coop.rchain.rspace.history.HistoryRepository
 import coop.rchain.rspace.internal.{ConsumeCandidate, _}
 import coop.rchain.rspace.trace._
 import coop.rchain.shared.{Cell, Log, Serialize}
@@ -23,8 +23,7 @@ import scodec.Codec
 
 class RSpace[F[_], C, P, A, K](
     historyRepository: HistoryRepository[F, C, P, A, K],
-    storeAtom: AtomicAny[HotStore[F, C, P, A, K]],
-    branch: Branch
+    storeAtom: AtomicAny[HotStore[F, C, P, A, K]]
 )(
     implicit
     serializeC: Serialize[C],
@@ -38,7 +37,7 @@ class RSpace[F[_], C, P, A, K](
     scheduler: ExecutionContext,
     metricsF: Metrics[F],
     val spanF: Span[F]
-) extends RSpaceOps[F, C, P, A, K](historyRepository, storeAtom, branch)
+) extends RSpaceOps[F, C, P, A, K](historyRepository, storeAtom)
     with ISpace[F, C, P, A, K] {
 
   def store: HotStore[F, C, P, A, K] = storeAtom.get()
@@ -239,8 +238,7 @@ object RSpace {
 
   def create[F[_], C, P, A, K](
       historyRepository: HistoryRepository[F, C, P, A, K],
-      store: HotStore[F, C, P, A, K],
-      branch: Branch
+      store: HotStore[F, C, P, A, K]
   )(
       implicit
       sc: Serialize[C],
@@ -256,7 +254,7 @@ object RSpace {
       spanF: Span[F]
   ): F[ISpace[F, C, P, A, K]] = {
     val space: ISpace[F, C, P, A, K] =
-      new RSpace[F, C, P, A, K](historyRepository, AtomicAny(store), branch)
+      new RSpace[F, C, P, A, K](historyRepository, AtomicAny(store))
     space.pure[F]
   }
 
@@ -277,22 +275,20 @@ object RSpace {
   ): F[(ISpace[F, C, P, A, K], IReplaySpace[F, C, P, A, K], HistoryRepository[F, C, P, A, K])] = {
     val v2Dir = dataDir.resolve("v2")
     for {
-      setup                  <- setUp[F, C, P, A, K](v2Dir, mapSize, Branch.MASTER)
+      setup                  <- setUp[F, C, P, A, K](v2Dir, mapSize)
       (historyReader, store) = setup
-      space                  = new RSpace[F, C, P, A, K](historyReader, AtomicAny(store), Branch.MASTER)
+      space                  = new RSpace[F, C, P, A, K](historyReader, AtomicAny(store))
       replayStore            <- HotStore.empty(historyReader)(sk.toCodec, concurrent)
       replay = new ReplayRSpace[F, C, P, A, K](
         historyReader,
-        AtomicAny(replayStore),
-        Branch.REPLAY
+        AtomicAny(replayStore)
       )
     } yield (space, replay, historyReader)
   }
 
   def create[F[_], C, P, A, K](
       dataDir: Path,
-      mapSize: Long,
-      branch: Branch
+      mapSize: Long
   )(
       implicit
       sc: Serialize[C],
@@ -308,15 +304,14 @@ object RSpace {
       spanF: Span[F],
       par: Parallel[F]
   ): F[ISpace[F, C, P, A, K]] =
-    setUp[F, C, P, A, K](dataDir, mapSize, branch).map {
+    setUp[F, C, P, A, K](dataDir, mapSize).map {
       case (historyReader, store) =>
-        new RSpace[F, C, P, A, K](historyReader, AtomicAny(store), branch)
+        new RSpace[F, C, P, A, K](historyReader, AtomicAny(store))
     }
 
   def setUp[F[_], C, P, A, K](
       dataDir: Path,
-      mapSize: Long,
-      branch: Branch
+      mapSize: Long
   )(
       implicit
       sc: Serialize[C],

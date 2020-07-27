@@ -14,7 +14,6 @@ import coop.rchain.models._
 import coop.rchain.rholang.interpreter.accounting._
 import coop.rchain.rholang.interpreter.errors.InterpreterError
 import coop.rchain.rspace.{Match, RSpace, ReplayRSpace, _}
-import coop.rchain.rspace.history.Branch
 import coop.rchain.shared.Log
 import coop.rchain.shared.PathOps.RichPath
 import monix.eval.Task
@@ -132,8 +131,7 @@ object BasicBench {
           TaggedContinuation
         ](
           dbDir,
-          1024L * 1024L * 1024L,
-          Branch("bench")
+          1024L * 1024L * 1024L
         )
         .unsafeRunSync
 

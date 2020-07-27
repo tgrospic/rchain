@@ -61,7 +61,6 @@ import coop.rchain.rholang.interpreter.{
   Runtime
 }
 import coop.rchain.rspace.ReportingRspace.ReportingEvent
-import coop.rchain.rspace.history.Branch
 import coop.rchain.rspace.{
   Blake2b256Hash,
   HotStore,
@@ -129,8 +128,7 @@ object ReportingCasper {
             TaggedContinuation
           ](
             historyRepository,
-            AtomicAny(replayStore),
-            Branch.REPLAY
+            AtomicAny(replayStore)
           )
           runtime <- ReportingRuntime
                       .createWithEmptyCost[F](reporting, Seq.empty)

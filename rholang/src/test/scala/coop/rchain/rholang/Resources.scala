@@ -13,7 +13,6 @@ import coop.rchain.rholang.interpreter.Runtime
 import coop.rchain.rholang.interpreter.Runtime.{RhoHistoryRepository, RhoISpace, SystemProcess}
 import coop.rchain.rspace
 import coop.rchain.rspace.RSpace
-import coop.rchain.rspace.history.{Branch, HistoryRepository}
 import coop.rchain.shared.Log
 import monix.execution.Scheduler
 
@@ -40,8 +39,7 @@ object Resources {
       prefix: String = ""
   ): Resource[F, RhoISpace[F]] = {
 
-    val branch: String = "test"
-    val mapSize: Long  = 1024L * 1024L * 4
+    val mapSize: Long = 1024L * 1024L * 4
 
     import coop.rchain.rholang.interpreter.storage._
     implicit val m: rspace.Match[F, BindPattern, ListParWithRandom] = matchListPar[F]
@@ -54,7 +52,7 @@ object Resources {
         BindPattern,
         ListParWithRandom,
         TaggedContinuation
-      ](dbDir, mapSize, Branch(branch))
+      ](dbDir, mapSize)
 
     mkTempDir(prefix)(implicitly[Concurrent[F]])
       .flatMap(tmpDir => Resource.make(mkRspace(tmpDir))(_.close()))

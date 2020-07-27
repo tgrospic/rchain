@@ -1280,8 +1280,6 @@ trait InMemoryReplayRSpaceTestsBase[C, P, A, K] extends ReplayRSpaceTestsBase[C,
     implicit val metricsF: Metrics[Task] = new Metrics.MetricsNOP[Task]()
     implicit val spanF: Span[Task]       = NoopSpan[Task]()
 
-    val branch = Branch("inmem")
-
     val dbDir: Path   = Files.createTempDirectory("replayrspace-test-")
     val mapSize: Long = 1024L * 1024L * 1024L
 
@@ -1317,8 +1315,7 @@ trait InMemoryReplayRSpaceTestsBase[C, P, A, K] extends ReplayRSpaceTestsBase[C,
       }
       space = new RSpace[Task, C, P, A, K](
         historyRepository,
-        store,
-        branch
+        store
       )
       historyCache <- Ref.of[Task, Cache[C, P, A, K]](
                        Cache[C, P, A, K]()
@@ -1330,8 +1327,7 @@ trait InMemoryReplayRSpaceTestsBase[C, P, A, K] extends ReplayRSpaceTestsBase[C,
       }
       replaySpace = new ReplayRSpace[Task, C, P, A, K](
         historyRepository,
-        replayStore,
-        branch
+        replayStore
       )
       res <- f(store, replayStore, space, replaySpace)
       _   <- Sync[Task].delay(dbDir.recursivelyDelete())
