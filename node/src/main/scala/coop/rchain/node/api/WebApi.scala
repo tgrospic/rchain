@@ -277,6 +277,8 @@ object WebApi {
         value <- exprFromParProto(v)
       } yield (key, value)
       ExprMap(fields.toMap).some
+    } else if (exp.exprInstance.isESetBody) {
+      ExprList(exp.getESetBody.ps.flatMap(exprFromParProto).toList).some
     } else none
 
   private def unforgFromProto(un: GUnforgeable): Option[ExprUnforg] =
