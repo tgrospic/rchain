@@ -16,7 +16,7 @@ object LastFinalizedBlockNotFound extends Exception
 final class LastFinalizedStorageOps[F[_]: Sync](
     private val store: LastFinalizedStorage[F]
 ) {
-  def getOrElse(blockHash: BlockHash): F[BlockHash] = store.get().map(_.getOrElse(blockHash))
+  def getOrElse(blockHash: => BlockHash): F[BlockHash] = store.get().map(_.getOrElse(blockHash))
 
   def getUnSafe: F[BlockHash] = store.get() >>= (_.liftTo(LastFinalizedBlockNotFound))
 }

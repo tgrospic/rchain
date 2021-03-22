@@ -30,6 +30,6 @@ final class KeyValueTypedStoreOps[F[_], K, V](
 
   def contains(key: K)(implicit f: Functor[F]): F[Boolean] = store.contains(Seq(key)).map(_.head)
 
-  def getOrElse(key: K, elseValue: V)(implicit f: Functor[F]): F[V] =
+  def getOrElse(key: K, elseValue: => V)(implicit f: Functor[F]): F[V] =
     get(key).map(_.getOrElse(elseValue))
 }
