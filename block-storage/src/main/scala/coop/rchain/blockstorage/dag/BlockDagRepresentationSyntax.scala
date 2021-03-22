@@ -6,6 +6,8 @@ import coop.rchain.casper.PrettyPrinter
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.models.BlockMetadata
 import coop.rchain.models.Validator.Validator
+import coop.rchain.shared.syntax._
+import fs2.Stream
 
 trait BlockDagRepresentationSyntax {
   implicit final def blockStorageSyntaxBlockDagRepresentation[F[_]: Sync](
@@ -44,8 +46,8 @@ final class BlockDagRepresentationOps[F[_]: Sync](
       enclosing: sourcecode.Enclosing,
       concurrent: Concurrent[F]
   ): F[List[BlockMetadata]] = {
-    val streams = hashes.map(h => fs2.Stream.eval(lookupUnsafe(h)))
-    fs2.Stream.emits(streams).parJoinUnbounded.compile.toList
+    val streams = hashes.map(h => Stream.eval(lookupUnsafe(h)))
+    Stream.emits(streams).parJoinProcBounded.compile.toList
   }
 
   def childrensMetas(hashes: Seq[BlockHash])(
@@ -55,11 +57,11 @@ final class BlockDagRepresentationOps[F[_]: Sync](
       concurrent: Concurrent[F]
   ): F[List[BlockMetadata]] = {
 
-    val childStream = fs2.Stream.emits(hashes).flatMap { h =>
-      fs2.Stream
+    val childStream = Stream.emits(hashes).flatMap { h =>
+      Stream
         .eval(dag.children(h).map(_.getOrElse(Set.empty)))
-        .flatMap(xs => fs2.Stream.fromIterator(xs.iterator))
-        .parEvalMapUnordered(100)(lookupUnsafe)
+        .flatMap(xs => Stream.fromIterator(xs.iterator))
+        .parEvalMapUnorderedProcBounded(lookupUnsafe)
     }
     childStream.compile.toList
 
