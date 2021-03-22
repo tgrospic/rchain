@@ -1,9 +1,8 @@
 package coop.rchain.node.api
 
-import cats.data.State
 import cats.effect.Concurrent
-import cats.mtl.implicits._
 import cats.syntax.all._
+import cats.{Applicative, MonoidK}
 import coop.rchain.blockstorage.BlockStore
 import coop.rchain.casper.{ReportingCasper, SafetyOracle}
 import coop.rchain.casper.api._
@@ -11,7 +10,6 @@ import coop.rchain.casper.engine.EngineCell.EngineCell
 import coop.rchain.casper.protocol._
 import coop.rchain.casper.protocol.deploy.v1._
 import coop.rchain.catscontrib.TaskContrib._
-import coop.rchain.graphz._
 import coop.rchain.metrics.Span
 import coop.rchain.models.StacksafeMessage
 import coop.rchain.monix.Monixable
@@ -95,32 +93,28 @@ object DeployGrpcServiceV1 {
         }
 
       def visualizeDag(request: VisualizeDagQuery): Observable[VisualizeBlocksResponse] = {
-        type Effect[A] = State[Vector[String], A]
-        implicit val ser: GraphSerializer[Effect]             = new ListSerializer[Effect]
-        val serialize: Effect[Graphz[Effect]] => List[String] = _.runS(Vector.empty).value.toList
-
         val depth            = if (request.depth <= 0) apiMaxBlocksLimit else request.depth
         val config           = GraphConfig(request.showJustificationLines)
         val startBlockNumber = request.startBlockNumber
 
+        val printToVector = GraphzGenerator.monoidGraphSerializer[F, Vector, Vector[String]] {
+          implicit gs => getResult =>
+            BlockAPI
+              .visualizeDag[F, Vector[String]](
+                startBlockNumber,
+                depth = depth,
+                (ts, lfb) => GraphzGenerator.dagAsCluster[F](ts, lfb, config),
+                _ => getResult
+              )
+              .map(_.getOrElse(Vector.empty))
+        }
+
         Observable
-          .fromTask(
-            deferList(
-              BlockAPI
-                .visualizeDag[F, Effect, List[String]](
-                  depth,
-                  apiMaxBlocksLimit,
-                  startBlockNumber,
-                  (ts, lfb) => GraphzGenerator.dagAsCluster[F, Effect](ts, lfb, config),
-                  serialize
-                )
-                .map(_.getOrElse(List.empty[String]))
-            ) { r =>
-              import VisualizeBlocksResponse.Message
-              import VisualizeBlocksResponse.Message._
-              VisualizeBlocksResponse(r.fold[Message](Error, Content))
-            }
-          )
+          .fromTask(deferList(printToVector.map(_.toList)) { r =>
+            import VisualizeBlocksResponse.Message
+            import VisualizeBlocksResponse.Message._
+            VisualizeBlocksResponse(r.fold[Message](Error, Content))
+          })
           .flatMap(Observable.fromIterable)
       }
 

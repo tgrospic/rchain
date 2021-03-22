@@ -1,31 +1,23 @@
 package coop.rchain.graphz
 
-import java.io.FileOutputStream
-
-import cats._
-import cats.effect.Sync
-import cats.implicits._
+import cats.{Applicative, Monad, MonoidK, Show}
+import cats.effect.concurrent.Ref
 import cats.mtl._
+import cats.syntax.all._
 
 trait GraphSerializer[F[_]] {
   def push(str: String, suffix: String = "\n"): F[Unit]
 }
 
+class MonoidRefSerializer[F[_], G[_]: MonoidK: Applicative](ref: Ref[F, G[String]])
+    extends GraphSerializer[F] {
+  def push(str: String, suffix: String): F[Unit] =
+    ref.update(s => MonoidK[G].combineK(s, (str + suffix).pure[G]))
+}
+
 class StringSerializer[F[_]: MonadState[?[_], StringBuffer]] extends GraphSerializer[F] {
   def push(str: String, suffix: String): F[Unit] =
     MonadState[F, StringBuffer].modify(sb => sb.append(str + suffix))
-}
-
-class ListSerializer[F[_]: MonadState[?[_], Vector[String]]] extends GraphSerializer[F] {
-  def push(str: String, suffix: String): F[Unit] =
-    MonadState[F, Vector[String]].modify(_ :+ (str + suffix))
-}
-
-class FileSerializer[F[_]: Sync](fos: FileOutputStream) extends GraphSerializer[F] {
-  def push(str: String, suffix: String): F[Unit] = Sync[F].delay {
-    fos.write(str.getBytes)
-    fos.flush()
-  }
 }
 
 sealed trait GraphType

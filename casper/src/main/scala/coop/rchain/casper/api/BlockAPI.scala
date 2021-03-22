@@ -3,7 +3,7 @@ package coop.rchain.casper.api
 import cats.Monad
 import cats.effect.concurrent.Semaphore
 import cats.effect.{Concurrent, Sync}
-import cats.implicits._
+import cats.syntax.all._
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.BlockStore
 import coop.rchain.blockstorage.dag.BlockDagStorage.DeployId
@@ -380,32 +380,18 @@ object BlockAPI {
       ))
   }
 
-  def visualizeDag[
-      F[_]: Monad: Sync: EngineCell: Log: SafetyOracle: BlockStore,
-      G[_]: Monad: GraphSerializer,
-      R
-  ](
-      depth: Int,
-      maxDepthLimit: Int,
+  def visualizeDag[F[_]: Sync: EngineCell: Log: SafetyOracle: BlockStore: GraphSerializer, R](
       startBlockNumber: Int,
-      visualizer: (Vector[Vector[BlockHash]], String) => F[G[Graphz[G]]],
-      serialize: G[Graphz[G]] => R
+      depth: Int,
+      visualizer: (Vector[Vector[BlockHash]], String) => F[Graphz[F]],
+      serialize: Graphz[F] => F[R]
   ): F[ApiErr[R]] = {
     val errorMessage = "visual dag failed"
     def casperResponse(implicit casper: MultiParentCasper[F]): F[ApiErr[R]] =
       for {
-        dag <- MultiParentCasper[F].blockDag
-        // the default startBlockNumber is 0
-        // if the startBlockNumber is 0 , it would use the latestBlockNumber for backward compatible
-        startBlockNum <- if (startBlockNumber == 0) dag.latestBlockNumber
-                        else Sync[F].delay(startBlockNumber.toLong)
-        topoSortDag <- dag.topoSort(
-                        startBlockNum - depth,
-                        Some(startBlockNum)
-                      )
-        lfb   <- casper.lastFinalizedBlock
-        graph <- visualizer(topoSortDag, PrettyPrinter.buildString(lfb.blockHash))
-      } yield serialize(graph).asRight[Error]
+        graph  <- extractDagAndLfb(casper, startBlockNumber, depth).flatMap(visualizer.tupled)
+        result <- serialize(graph)
+      } yield result.asRight[Error]
     EngineCell[F].read >>= (_.withCasper[ApiErr[R]](
       casperResponse(_),
       Log[F]
@@ -413,6 +399,29 @@ object BlockAPI {
         .as(s"Error: $errorMessage".asLeft)
     ))
   }
+
+  /**
+    * Extract a slice of the DAG from starting block until some depth
+    *
+    * @return topologically sorted DAG & last finalized block hash
+    */
+  private def extractDagAndLfb[F[_]: Sync: Log: SafetyOracle: BlockStore: GraphSerializer](
+      casper: MultiParentCasper[F],
+      startBlockNumber: Int,
+      depth: Int
+  ): F[(Vector[Vector[BlockHash]], String)] =
+    for {
+      dag <- casper.blockDag
+      // the default startBlockNumber is 0
+      // if the startBlockNumber is 0 , it would use the latestBlockNumber for backward compatible
+      startBlockNum <- if (startBlockNumber == 0) dag.latestBlockNumber
+                      else Sync[F].delay(startBlockNumber.toLong)
+      topoSortDag <- dag.topoSort(
+                      startBlockNum - depth,
+                      Some(startBlockNum)
+                    )
+      lfb <- casper.lastFinalizedBlock
+    } yield (topoSortDag, PrettyPrinter.buildString(lfb.blockHash))
 
   def machineVerifiableDag[
       F[_]: Monad: Sync: EngineCell: Log: SafetyOracle: BlockStore

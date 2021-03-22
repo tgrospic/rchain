@@ -1,13 +1,14 @@
 package coop.rchain.casper.api
 
+import cats.effect.{Concurrent, Sync}
+import cats.effect.concurrent.Ref
+import cats.syntax.all._
 import cats.{Monad, _}
-import cats.effect.Sync
-import cats.implicits._
 import coop.rchain.blockstorage.BlockStore
 import coop.rchain.casper._
 import coop.rchain.casper.syntax._
 import coop.rchain.catscontrib.Catscontrib._
-import coop.rchain.graphz._
+import coop.rchain.graphz.{GraphSerializer, _}
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.shared.Log
 
@@ -32,87 +33,89 @@ object GraphzGenerator {
     def empty[G[_]]: DagInfo[G] = DagInfo[G]()
   }
 
-  def dagAsCluster[
-      F[_]: Monad: Sync: Log: SafetyOracle: BlockStore,
-      G[_]: Monad: GraphSerializer
-  ](
+  /**
+    * Provides instance of GraphSerializer for any monoidal result (e.g. Vector, List)
+    *
+    * @param f wrapper function which gives serializer and extraction of the final result
+    */
+  def monoidGraphSerializer[F[_]: Sync, G[_]: MonoidK: Applicative, A](
+      f: GraphSerializer[F] => F[G[String]] => F[A]
+  ): F[A] =
+    Ref.of(MonoidK[G].empty[String]).flatMap { r =>
+      f(new MonoidRefSerializer(r))(r.get)
+    }
+
+  def dagAsCluster[F[_]: Sync: Log: SafetyOracle: BlockStore: GraphSerializer](
       topoSort: Vector[Vector[BlockHash]],
       lastFinalizedBlockHash: String,
       config: GraphConfig
-  ): F[G[Graphz[G]]] =
+  ): F[Graphz[F]] =
     for {
-      acc <- topoSort.foldM(DagInfo.empty[G])(accumulateDagInfo[F, G](_, _))
-    } yield {
+      acc <- topoSort.foldM(DagInfo.empty[F])(accumulateDagInfo[F](_, _))
 
-      val timeseries     = acc.timeseries.reverse
-      val firstTs        = timeseries.head
-      val validators     = acc.validators
-      val validatorsList = validators.toList.sortBy(_._1)
-      for {
-        g <- initGraph[G]("dag")
-        allAncestors = validatorsList
-          .flatMap {
-            case (_, blocks) =>
-              blocks.get(firstTs).map(_.flatMap(b => b.parentsHashes)).getOrElse(List.empty[String])
+      timeseries     = acc.timeseries.reverse
+      firstTs        = timeseries.head
+      validators     = acc.validators
+      validatorsList = validators.toList.sortBy(_._1)
+
+      g <- initGraph[F]("dag")
+      allAncestors = validatorsList
+        .flatMap {
+          case (_, blocks) =>
+            blocks.get(firstTs).map(_.flatMap(b => b.parentsHashes)).getOrElse(List.empty[String])
+        }
+        .distinct
+        .sorted
+      // draw ancesotrs first
+      _ <- allAncestors.traverse(
+            ancestor =>
+              g.node(
+                ancestor,
+                style = styleFor(ancestor, lastFinalizedBlockHash),
+                shape = Box
+              )
+          )
+      // create invisible edges from ancestors to first node in each cluster for proper alligment
+      _ <- validatorsList.traverse {
+            case (id, blocks) =>
+              allAncestors.traverse(ancestor => {
+                val nodes = nodesForTs(id, firstTs, blocks, lastFinalizedBlockHash).keys.toList
+                nodes.traverse(node => g.edge(ancestor, node, style = Some(Invis)))
+              })
           }
-          .distinct
-          .sorted
-        // draw ancesotrs first
-        _ <- allAncestors.traverse(
-              ancestor =>
-                g.node(
-                  ancestor,
-                  style = styleFor(ancestor, lastFinalizedBlockHash),
-                  shape = Box
-                )
-            )
-        // create invisible edges from ancestors to first node in each cluster for proper alligment
-        _ <- validatorsList.traverse {
-              case (id, blocks) =>
-                allAncestors.traverse(ancestor => {
-                  val nodes = nodesForTs(id, firstTs, blocks, lastFinalizedBlockHash).keys.toList
-                  nodes.traverse(node => g.edge(ancestor, node, style = Some(Invis)))
-                })
-            }
-        // draw clusters per validator
-        _ <- validatorsList.traverse {
-              case (id, blocks) =>
-                g.subgraph(
-                  validatorCluster(id, blocks, timeseries, lastFinalizedBlockHash)
-                )
-            }
-        // draw parent dependencies
-        _ <- drawParentDependencies[G](g, validatorsList.map(_._2))
-        // draw justification dotted lines
-        _ <- config.showJustificationLines.fold(
-              drawJustificationDottedLines[G](g, validators),
-              ().pure[G]
-            )
-        _ <- g.close
-      } yield g
+      // draw clusters per validator
+      _ <- validatorsList.traverse {
+            case (id, blocks) =>
+              g.subgraph(
+                validatorCluster(id, blocks, timeseries, lastFinalizedBlockHash)
+              )
+          }
+      // draw parent dependencies
+      _ <- drawParentDependencies[F](g, validatorsList.map(_._2))
+      // draw justification dotted lines
+      _ <- config.showJustificationLines.fold(
+            drawJustificationDottedLines[F](g, validators),
+            ().pure[F]
+          )
+      _ <- g.close
+    } yield g
 
-    }
-
-  private def accumulateDagInfo[
-      F[_]: Monad: Sync: Log: SafetyOracle: BlockStore,
-      G[_]
-  ](
-      acc: DagInfo[G],
+  private def accumulateDagInfo[F[_]: Sync: Log: SafetyOracle: BlockStore](
+      acc: DagInfo[F],
       blockHashes: Vector[BlockHash]
-  ): F[DagInfo[G]] =
+  ): F[DagInfo[F]] =
     for {
       blocks    <- blockHashes.traverse(BlockStore[F].getUnsafe)
       timeEntry = blocks.head.body.state.blockNumber
       validators = blocks.toList.map { b =>
         val blockHash       = PrettyPrinter.buildString(b.blockHash)
         val blockSenderHash = PrettyPrinter.buildString(b.sender)
-        val parents = b.header.parentsHashList.toList
+        val parents = b.header.parentsHashList
           .map(PrettyPrinter.buildString)
         val justifications = b.justifications
           .map(_.latestBlockHash)
           .map(PrettyPrinter.buildString)
-          .toSet
-          .toList
+          .distinct
         val validatorBlocks =
           Map(timeEntry -> List(ValidatorBlock(blockHash, parents, justifications)))
         Map(blockSenderHash -> validatorBlocks)

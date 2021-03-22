@@ -1,6 +1,5 @@
 package coop.rchain.casper.helper
 
-import cats.data.State
 import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.{Concurrent, ContextShift, Resource, Sync}
 import cats.syntax.all._
@@ -12,6 +11,7 @@ import coop.rchain.blockstorage.deploy.DeployStorage
 import coop.rchain.blockstorage.finality.{LastFinalizedKeyValueStorage, LastFinalizedStorage}
 import coop.rchain.casper
 import coop.rchain.casper._
+import coop.rchain.casper.api.BlockAPI.ApiErr
 import coop.rchain.casper.api.{BlockAPI, GraphConfig, GraphzGenerator}
 import coop.rchain.casper.engine.BlockRetriever._
 import coop.rchain.casper.engine.EngineCell._
@@ -29,7 +29,6 @@ import coop.rchain.comm.rp.Connect._
 import coop.rchain.comm.rp.HandleMessages.handle
 import coop.rchain.crypto.PrivateKey
 import coop.rchain.crypto.signatures.{Secp256k1, Signed}
-import coop.rchain.graphz.{Graphz, StringSerializer}
 import coop.rchain.metrics.{Metrics, NoopSpan, Span}
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.p2p.EffectsTestInstances._
@@ -222,26 +221,18 @@ class TestNode[F[_]](
   def shutoff() = transportLayerEff.clear(local)
 
   def visualizeDag(startBlockNumber: Int): F[String] = {
-
-    type G[A] = State[StringBuffer, A]
-    import cats.mtl.implicits._
-
-    implicit val serializer = new StringSerializer[G]
-    val serialize: G[Graphz[G]] => String =
-      _.runS(new StringBuffer("")).value.toString
-
-    val result: F[Either[String, String]] = BlockAPI.visualizeDag[F, G, String](
-      Int.MaxValue,
-      apiMaxBlocksLimit,
-      startBlockNumber,
-      (ts, lfb) =>
-        GraphzGenerator.dagAsCluster[F, G](
-          ts,
-          lfb,
-          GraphConfig(showJustificationLines = true)
-        ),
-      serialize
-    )
+    val config = GraphConfig(showJustificationLines = true)
+    val result =
+      GraphzGenerator.monoidGraphSerializer[F, Vector, ApiErr[String]] { implicit gs => getResult =>
+        val r = BlockAPI
+          .visualizeDag[F, Vector[String]](
+            startBlockNumber,
+            depth = Int.MaxValue,
+            (ts, lfb) => GraphzGenerator.dagAsCluster[F](ts, lfb, config),
+            _ => getResult
+          )
+        r.map(_.map(_.combineAll))
+      }
     result.map(_.right.get)
   }
 
