@@ -1,10 +1,8 @@
 package coop.rchain.casper.util
 
-import java.nio.charset.StandardCharsets
-import cats.data.OptionT
+import cats.Monad
 import cats.effect.Sync
 import cats.syntax.all._
-import cats.{Applicative, Monad}
 import com.google.protobuf.{ByteString, Int32Value, StringValue}
 import coop.rchain.blockstorage.BlockStore
 import coop.rchain.blockstorage.dag.BlockDagRepresentation
@@ -19,9 +17,11 @@ import coop.rchain.dag.DagOps
 import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.models.Validator.Validator
 import coop.rchain.models._
+import coop.rchain.models.syntax._
 import coop.rchain.rholang.interpreter.DeployParameters
 import coop.rchain.shared.syntax._
 
+import java.nio.charset.StandardCharsets
 import scala.collection.immutable
 import scala.collection.immutable.Map
 

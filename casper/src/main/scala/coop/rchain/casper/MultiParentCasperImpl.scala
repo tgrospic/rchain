@@ -1,51 +1,34 @@
 package coop.rchain.casper
 
-import cats.{Applicative, Show}
 import cats.data.EitherT
 import cats.effect.{Concurrent, Sync}
-import cats.effect.concurrent.{Ref, Semaphore}
 import cats.syntax.all._
 import coop.rchain.blockstorage._
-import coop.rchain.blockstorage.dag.{BlockDagRepresentation, BlockDagStorage}
-import coop.rchain.blockstorage.dag.BlockDagStorage.DeployId
-import coop.rchain.casper.protocol._
-import coop.rchain.casper.syntax._
-import coop.rchain.casper.util._
-import coop.rchain.casper.util.ProtoUtil._
-import coop.rchain.casper.util.comm.CommUtil
-import coop.rchain.casper.util.rholang._
-import coop.rchain.casper.util.rholang.RuntimeManager.StateHash
-import coop.rchain.catscontrib.BooleanF._
-import coop.rchain.catscontrib.Catscontrib.ToBooleanF
-import coop.rchain.metrics.{Metrics, Span}
-import coop.rchain.metrics.implicits._
-import coop.rchain.models.BlockHash._
-import coop.rchain.models.{
-  BindPattern,
-  BlockMetadata,
-  EquivocationRecord,
-  ListParWithRandom,
-  NormalizerEnv,
-  Par,
-  TaggedContinuation
-}
-import coop.rchain.models.Validator.Validator
-import coop.rchain.shared._
 import coop.rchain.blockstorage.casperbuffer.CasperBufferStorage
+import coop.rchain.blockstorage.dag.BlockDagStorage.DeployId
+import coop.rchain.blockstorage.dag.{BlockDagRepresentation, BlockDagStorage}
 import coop.rchain.blockstorage.deploy.DeployStorage
 import coop.rchain.blockstorage.finality.LastFinalizedStorage
-import coop.rchain.casper.blocks.merger.MergingVertex
 import coop.rchain.casper.engine.BlockRetriever
 import coop.rchain.casper.finality.Finalizer
-import coop.rchain.casper.safety.CliqueOracle
 import coop.rchain.casper.merging.BlockIndex
-import coop.rchain.crypto.PublicKey
-import coop.rchain.crypto.codec.Base16
+import coop.rchain.casper.protocol._
+import coop.rchain.casper.syntax._
+import coop.rchain.casper.util.ProtoUtil._
+import coop.rchain.casper.util._
+import coop.rchain.casper.util.comm.CommUtil
+import coop.rchain.casper.util.rholang._
+import coop.rchain.catscontrib.Catscontrib.ToBooleanF
 import coop.rchain.crypto.signatures.Signed
-import coop.rchain.dag
 import coop.rchain.dag.DagOps
+import coop.rchain.metrics.implicits._
+import coop.rchain.metrics.{Metrics, Span}
+import coop.rchain.models.BlockHash._
+import coop.rchain.models.Validator.Validator
+import coop.rchain.models.syntax._
+import coop.rchain.models.{BlockHash => _, _}
 import coop.rchain.rspace.hashing.Blake2b256Hash
-import coop.rchain.models.ByteStringOps._
+import coop.rchain.shared._
 
 class MultiParentCasperImpl[F[_]: Sync: Concurrent: Log: Time: SafetyOracle: BlockStore: BlockDagStorage: LastFinalizedStorage: CommUtil: EventPublisher: Estimator: DeployStorage: BlockRetriever](
     validatorId: Option[ValidatorIdentity],

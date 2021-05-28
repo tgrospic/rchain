@@ -5,6 +5,7 @@ import coop.rchain.crypto.PublicKey
 import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.models.BlockHash._
 import coop.rchain.models.NormalizerEnv.{Contains, ToEnvMap}
+import coop.rchain.models.syntax._
 import coop.rchain.rholang.interpreter.RhoType._
 
 final case class SlashDeploy(
@@ -16,8 +17,7 @@ final case class SlashDeploy(
   import Expr.ExprInstance._
   import rholang.{implicits => toPar}
   import shapeless._
-  import record._
-  import syntax.singleton._
+  import shapeless.syntax.singleton._
 
   type Output = (RhoBoolean, Either[RhoString, RhoNil])
   type Result = Unit

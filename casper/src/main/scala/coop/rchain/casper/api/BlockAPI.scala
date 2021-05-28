@@ -3,7 +3,7 @@ package coop.rchain.casper.api
 import cats.Monad
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
-import cats.implicits._
+import cats.syntax.all._
 import com.google.protobuf.ByteString
 import coop.rchain.blockstorage.BlockStore
 import coop.rchain.blockstorage.dag.BlockDagStorage.DeployId
@@ -24,9 +24,10 @@ import coop.rchain.crypto.codec.Base16
 import coop.rchain.crypto.signatures.Signed
 import coop.rchain.graphz._
 import coop.rchain.metrics.{Metrics, Span}
-import coop.rchain.models.BlockHash.{BlockHash, _}
+import coop.rchain.models.BlockHash.BlockHash
 import coop.rchain.models.rholang.sorter.Sortable._
 import coop.rchain.models.serialization.implicits.mkProtobufInstance
+import coop.rchain.models.syntax._
 import coop.rchain.models.{BlockMetadata, Par}
 import coop.rchain.rspace.ReportingRspace.ReportingEvent
 import coop.rchain.rspace.hashing.StableHashProvider

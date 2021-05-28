@@ -4,20 +4,19 @@ import cats.effect.Sync
 import cats.implicits._
 import cats.{~>, Applicative}
 import com.google.protobuf.ByteString
-import coop.rchain.casper.{ReportBlockNotFound, ReportError, ReportReplayError}
-import coop.rchain.models.BlockHash._
-import coop.rchain.casper.ReportingCasper
 import coop.rchain.casper.protocol.ProcessedDeploy
-import coop.rchain.casper.util.rholang.{InternalError, ReplayFailure}
+import coop.rchain.casper.{ReportBlockNotFound, ReportError, ReportReplayError, ReportingCasper}
 import coop.rchain.crypto.codec.Base16
-import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
+import coop.rchain.models.BlockHash._
 import coop.rchain.models.TaggedContinuation.TaggedCont.{Empty, ParBody, ScalaBodyRef}
-import coop.rchain.rspace.ReportingRspace.ReportingEvent
-import coop.rchain.rspace.ReportingTransformer.ReportingRhoStringTransformer._
-import org.http4s.{HttpRoutes, QueryParamDecoder}
-import coop.rchain.rspace.ReportingTransformer
+import coop.rchain.models.syntax._
+import coop.rchain.models.{BindPattern, ListParWithRandom, Par, TaggedContinuation}
 import coop.rchain.rholang.interpreter.{PrettyPrinter => RhoPrinter}
+import coop.rchain.rspace.ReportingRspace.ReportingEvent
+import coop.rchain.rspace.ReportingTransformer
+import coop.rchain.rspace.ReportingTransformer.ReportingRhoStringTransformer._
 import org.http4s.circe.jsonEncoderOf
+import org.http4s.{HttpRoutes, QueryParamDecoder}
 
 object ReportingRoutes {
 
