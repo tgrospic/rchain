@@ -45,6 +45,7 @@ import coop.rchain.crypto.signatures.Signed
 import coop.rchain.dag
 import coop.rchain.dag.DagOps
 import coop.rchain.rspace.hashing.Blake2b256Hash
+import coop.rchain.models.ByteStringOps._
 
 class MultiParentCasperImpl[F[_]: Sync: Concurrent: Log: Time: SafetyOracle: BlockStore: BlockDagStorage: LastFinalizedStorage: CommUtil: EventPublisher: Estimator: DeployStorage: BlockRetriever](
     validatorId: Option[ValidatorIdentity],
