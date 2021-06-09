@@ -15,7 +15,8 @@ import scala.util.Random
 object VaultBalanceGetter {
 
   private def newReturnName: Par =
-    GPrivate(ByteString.copyFromUtf8(Random.alphanumeric.take(10).foldLeft("")(_ + _)))
+    GPrivate(ByteString.copyFromUtf8(Random.alphanumeric.take(10).mkString))
+
   private def getBalancePar(vaultPar: Par, returnChannel: Par) =
     Par(
       sends = Seq(

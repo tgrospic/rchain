@@ -20,7 +20,7 @@ class RhoTrieTraverserTest extends FlatSpec {
     val total     = 100
     val trieDepth = 2
     val insertKeyValues = (0 to total).map(
-      i => (Random.alphanumeric.take(10).foldLeft("")(_ + _), Random.nextInt(1000000), i)
+      i => (Random.alphanumeric.take(10).mkString, Random.nextInt(1000000), i)
     )
     val insertRho = insertKeyValues.foldLeft("") {
       case (acc, (key, value, index)) =>
