@@ -35,12 +35,12 @@ object KademliaNodeDiscovery {
          * distance from our own key. So, construct a key that first differs
          * from ours at bit position dist.
          */
-        val target       = id.key.to[mutable.ArrayBuffer] // Our key
+        val target       = id.key.to(mutable.ArrayBuffer) // Our key
         val byteIndex    = dist / 8
         val differentBit = 1 << (dist % 8)
         target(byteIndex) = (target(byteIndex) ^ differentBit).toByte // A key at a distance dist from me
 
-        KademliaRPC[F].lookup(target, peerSet.head) >>= (filter(_, potentials)) >>= (
+        KademliaRPC[F].lookup(target.toSeq, peerSet.head) >>= (filter(_, potentials)) >>= (
             ps => find(limit, dists, peerSet.tail, potentials ++ ps, i + 1)
         )
       } else {

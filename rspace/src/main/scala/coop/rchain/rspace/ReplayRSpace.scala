@@ -15,9 +15,9 @@ import coop.rchain.shared.SyncVarOps._
 import coop.rchain.shared.{Log, Serialize}
 import monix.execution.atomic.AtomicAny
 
-import scala.collection.JavaConverters._
 import scala.collection.SortedSet
 import scala.concurrent.ExecutionContext
+import scala.jdk.CollectionConverters._
 
 class ReplayRSpace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, A, K](
     historyRepository: HistoryRepository[F, C, P, A, K],
@@ -201,7 +201,7 @@ class ReplayRSpace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, A, 
     val datum: Datum[A] = datumWithIndex._1
     def wasRepeatedEnoughTimes: Boolean =
       if (!datum.persist) {
-        comm.timesRepeated(datum.source) === produceCounter.get(datum.source)
+        comm.timesRepeated(datum.source) === produceCounter.peek()(datum.source)
       } else true
     comm.produces.contains(datum.source) && wasRepeatedEnoughTimes
   }
@@ -245,7 +245,7 @@ class ReplayRSpace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, A, 
     }
   }
 
-  override def createCheckpoint(): F[Checkpoint] = checkReplayData >> syncF.defer {
+  override def createCheckpoint(): F[Checkpoint] = checkReplayData() >> syncF.defer {
     for {
       changes     <- storeAtom.get().changes()
       nextHistory <- historyRepositoryAtom.get().checkpoint(changes.toList)
@@ -294,22 +294,22 @@ class ReplayRSpace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, A, 
         cs: Seq[COMM]
     ): F[Either[Seq[COMM], COMMOrCandidate]] =
       cs match {
-        case Nil =>
-          val msg = "List comms must not be empty"
-          logger.error(msg)
-          Sync[F].raiseError(new IllegalArgumentException(msg))
-        case commRef :: Nil =>
+        case commRef +: Nil =>
           runMatcher(commRef).map {
             case Some(dataCandidates) =>
               (commRef, dataCandidates).asRight[COMM].asRight[Seq[COMM]]
             case None => commRef.asLeft[(COMM, Candidate)].asRight[Seq[COMM]]
           }
-        case commRef :: rem =>
+        case commRef +: rem =>
           runMatcher(commRef).map {
             case Some(dataCandidates) =>
               (commRef, dataCandidates).asRight[COMM].asRight[Seq[COMM]]
             case None => rem.asLeft[COMMOrCandidate]
           }
+        case _ =>
+          val msg = "List comms must not be empty"
+          logger.error(msg)
+          Sync[F].raiseError(new IllegalArgumentException(msg))
       }
     comms.tailRecM(go).map(_.toOption)
   }

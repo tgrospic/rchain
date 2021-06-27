@@ -23,9 +23,9 @@ final class SortedParHashSet(ps: HashSet[Par]) extends Iterable[Par] {
 
   def union(that: GenSet[Par]): SortedParHashSet = SortedParHashSet(sortedPs.union(that.map(sort)))
 
-  def empty: SortedParHashSet = SortedParHashSet(HashSet.empty[Par])
+  override def empty: SortedParHashSet = SortedParHashSet(HashSet.empty[Par])
 
-  def iterator: Iterator[Par] = sortedPars.toIterator
+  def iterator: Iterator[Par] = sortedPars.iterator
 
   override def equals(that: Any): Boolean = that match {
     case sph: SortedParHashSet => sph.sortedPars == this.sortedPars

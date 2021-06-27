@@ -42,7 +42,7 @@ trait IReplaySpace[F[_], C, P, A, K] extends ISpace[F, C, P, A, K] {
 
         commEvents.foreach {
           case comm @ COMM(consume, produces, _, _) =>
-            (consume +: produces).foreach { ioEvent =>
+            ((consume: IOEvent) +: produces).foreach { ioEvent =>
               if (newStuff(ioEvent)) {
                 replayData.addBinding(ioEvent, comm)
               }

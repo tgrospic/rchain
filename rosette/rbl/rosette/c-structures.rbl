@@ -49,7 +49,7 @@
 
 ;;; The basic elements of this design are a tree of structure-descriptor
 ;;; classes.  Descriptors are similar to C++ refs in behavior.
-;;; 
+;;;
 ;;; The basic operations are '. and ':=.  Each of these take a descriptor
 ;;; and 0 or more selectors.  There are two distinguished selectors:
 ;;; '^ and '@.  The denote respectively, de-referencing and referencing.
@@ -192,14 +192,14 @@
       (RuntimeError (self) "not a ByteVec in cast" what)))
 
 (defMethod GenericDescriptor (init o)
-  (free [align! tracing?]
+  (free [align! tracing*]
     (seq (if tracing?
 	     (display (self) " initing at offset: " o #\\n))
 	 (update! 'offset! (fx+ o (align! o)))
 	 (self))))
 
 (defMethod GenericDescriptor (s_free)
-    (free [tracing?]
+    (free [tracing*]
       (seq (if tracing? ("freeing " (self) #\\n))
 	   (if (niv? mnemonic)
 	       (u_free (lookup 'offset! (self))))
@@ -227,10 +227,10 @@
 (defOprn (sbo& (sbo GenericDescriptor)) flatten prim-flatten)
 
 (defMethod GenericDescriptor (->value)
-  (seq (update!) (flatten (self) 0)))	 	 	 
+  (seq (update!) (flatten (self) 0)))
 
 (defPure GenericDescriptor (Trace)
-  (free [tracing?]
+  (free [tracing*]
     (set tracing? (not tracing?) (sbo GenericDescriptor))))
 
 ;;; The NullDescriptor class represents the root of the hierarchy of
@@ -248,9 +248,9 @@
 ;;; it is created and cached for all future references.
 
 (defMethod NullDescriptor (new o) (self));; ensures a unique null for each type
-(defPure NullDescriptor (->value) (self))  
+(defPure NullDescriptor (->value) (self))
 (defPure NullDescriptor (nth & r) (RuntimeError (self) "Cannot index " r))
-    
+
 
 (defSlot (sbo GenericDescriptor) isNull? #f)
 (defSlot (sbo NullDescriptor) isNull? #t)
@@ -441,7 +441,7 @@
 ;;; A CArray descriptor consists of a number of elements, an element
 ;;; descriptor, and an offset for the array from the base of a (potentially)
 ;;; containing structure or memory 0.
-;;; 
+;;;
 ;;; The alignment requirement of an AD is that of its elemDesc.
 
 (defMethod CArray (gen-init n)

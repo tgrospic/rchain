@@ -1,11 +1,18 @@
 package coop.rchain.comm.discovery
 
-import coop.rchain.comm.{CommError, PeerNode}, CommError._
+import coop.rchain.comm.{CommError, PeerNode}
+import CommError._
+
 import scala.collection.mutable
 import scala.annotation.tailrec
-import cats._, cats.data._, cats.implicits._
-import coop.rchain.catscontrib._, Catscontrib._
+import cats._
+import cats.data._
+import cats.implicits._
+import coop.rchain.catscontrib._
+import Catscontrib._
 import cats.effect._
+
+import scala.reflect.ClassTag
 
 trait Keyed {
   def key: Seq[Byte]
@@ -241,7 +248,7 @@ final class PeerTable[A <: PeerNode, F[_]: Sync: KademliaRPC](
   /**
     * Return a sequence of all the `A`s in the table.
     */
-  def peers: F[Seq[A]] =
+  def peers(implicit c: ClassTag[A]): F[Seq[A]] =
     Sync[F].delay(table.flatMap(l => l synchronized { l.map(_.entry) }))
 
   /**

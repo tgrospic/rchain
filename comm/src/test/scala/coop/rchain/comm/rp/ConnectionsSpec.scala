@@ -7,7 +7,7 @@ import coop.rchain.p2p.effects._
 import coop.rchain.metrics.Metrics
 import cats.{catsInstancesForId => _, _}, cats.data._, cats.implicits._
 import coop.rchain.catscontrib._, Catscontrib._, ski._
-import coop.rchain.catscontrib.effect.implicits._
+import coop.rchain.catscontrib.effect.instances._
 import coop.rchain.p2p.EffectsTestInstances._
 import org.scalatest._
 

@@ -58,10 +58,10 @@
 	     (loop argv)))))
 
 (add 'DOCS-ON-LINE? (arg-flag "-docs"))
- 
+
 (if (arg-flag "-ess_sysdir")
     (tbl-add envp 'ESS_SYSDIR (arg-val "-ess_sysdir")))
- 
+
 (if (absent? (tbl-get envp 'ESS_SYSDIR))
     (seq (tbl-add envp 'ESS_SYSDIR ".")
  	 (prim-display "***warning: ESS_SYSDIR not set in environment\n")
@@ -112,7 +112,7 @@
        (p read-expr)
        (p resume-io)
        (p signal)
-       
+
        (p select)
        (p flatten)
        (p S-get)
@@ -120,7 +120,7 @@
        (p S-deref)
        (p S-set)
        (p S-tupleSet)
-       
+
        (p handle-alarm)
        (p runtime-error)
        (p formals-mismatch)
@@ -128,7 +128,7 @@
        (p missing-binding)
        (p vm-error)
        (p lookupAndInvoke)
-       
+
        (p add)
        (p init)
        (p new)
@@ -249,7 +249,7 @@
 (add binding:
      (method [key obj] (binding!: (self) key obj))
      Procedural-SBO)
-       
+
 (add binding!:
      (method [key obj]
        (seq (set-obo (meta (self)) (self) 'id [key obj])
@@ -341,7 +341,7 @@
 		 (slot-attrs!!: k 'summary s 'details d 'usage u))
 	     (update!))))
      Meta-SBO)
-	 
+
 (add-unique Oprn 'docs!:)
 (add docs!:
      (method [k s d]
@@ -352,7 +352,7 @@
 		 (slot-attrs!!: k 'summary s 'details d))
 	     (update!))))
      Meta-SBO)
-	 
+
 (add-unique Sync 'addPD)
 (add addPD
      (method [val obj sum det usg]
@@ -637,7 +637,7 @@
 ;;; at end-of-stream
 
 (add 'eval-file
-     (named-proc eval-file [str silent?]
+     (named-proc eval-file [str silent*]
        (let [[expr (istream-read str)]]
 	 (label load-loop
 	   (if (eof? expr)
@@ -680,7 +680,7 @@
 (add 'Loaded ['boot])
 
 (add 'load
-    (named-proc load [nm & silent?]
+    (named-proc load [nm & silent*]
         (let [[[str dir fnm] (find-file (->string nm) load-paths)]
           [saved-load-paths  load-paths]
           [saved-source-file **SOURCE-FILE**]

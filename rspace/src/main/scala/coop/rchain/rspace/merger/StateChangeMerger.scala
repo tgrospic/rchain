@@ -32,17 +32,18 @@ object StateChangeMerger {
             init <- baseReader.getData(valuePointerHash).map(_.map(_.raw))
             r = (init diff changes.removed) ++ changes.added match {
               // if no datums left - the whole produce is removed
-              case Seq() if init.nonEmpty => TrieDeleteProduce(valuePointerHash).some
+              case Seq() if init.nonEmpty =>
+                (TrieDeleteProduce(valuePointerHash): HotStoreTrieAction).some
               // if base state had no datums - produce is created,
               // if base state had datums but value is changed - produce adjusted (new value inserted)
               case newVal if init != newVal =>
-                TrieInsertBinaryProduce(valuePointerHash, newVal).some
+                (TrieInsertBinaryProduce(valuePointerHash, newVal): HotStoreTrieAction).some
               // if value not changed - do nothing
               case _ => None
             }
           } yield r
       }
-      .collect { case Some(v) => v }
+      .collect { case Some(v) => v: HotStoreTrieAction }
 
     /**
       * This classes are used to compute joins.
@@ -103,6 +104,9 @@ object StateChangeMerger {
                   TrieInsertBinaryConsume(valuePointerHash, newVal),
                   None
                 ).some
+
+              // TODO: [upgrade Scala 2.13] fix _match may not be exhaustive_
+              case _ => None
             }
           } yield r
       }
@@ -152,12 +156,14 @@ object StateChangeMerger {
                                val newVal = action match {
                                  case AddJoin(_)    => (cur.toSet + joinBody)
                                  case RemoveJoin(_) => (cur.toSet - joinBody)
+                                 // TODO: [upgrade Scala 2.13] fix _match may not be exhaustive_
+                                 case _ => cur
                                }
                                a.updated(jp, newVal.toSeq)
                              })
                            } yield next
                          // this clause means that consume adding/deleting did not influence joins
-                         case None => acc.pure
+                         case None => acc.pure[F]
                        }
 
                    }
@@ -165,9 +171,10 @@ object StateChangeMerger {
       joinsActions = newJoins.map {
         case (joinPointer, joins) =>
           joins match {
-            case Seq() => TrieDeleteJoins(joinPointer)
+            case Seq() => TrieDeleteJoins(joinPointer): HotStoreTrieAction
             // Joins must be sorted to produce replayable root hash
-            case newVal => TrieInsertBinaryJoins(joinPointer, newVal.sorted(util.ordByteVector))
+            case newVal =>
+              TrieInsertBinaryJoins(joinPointer, newVal.sorted(util.ordByteVector)): HotStoreTrieAction
           }
       }
 

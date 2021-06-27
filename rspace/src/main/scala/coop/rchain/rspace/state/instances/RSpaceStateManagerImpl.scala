@@ -25,6 +25,7 @@ object RSpaceStateManagerImpl {
     def hasRoot: F[Boolean] =
       exporter.getRoot.map(kp(true)).handleError {
         case NoRootError => false
+        case _           => true
       }
   }
 }

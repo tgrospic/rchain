@@ -91,6 +91,9 @@ object RSpaceExporter {
           // Tries left to process
           remainingKeys = childNotLeafs ++ keysRest
         } yield (remainingKeys, pathRest, counter, collected).asLeft
+
+      // TODO: [upgrade Scala 2.13] fix _match may not be exhaustive_
+      case _ => currentNodes.asRight[ReadParams[F]].pure[F]
     }
   }
 
@@ -124,6 +127,8 @@ object RSpaceExporter {
           case _ =>
             Vector.empty
         }
+      // TODO: [upgrade Scala 2.13] fix _match may not be exhaustive_
+      case _ => Vector.empty
     }
 
   // Pretty printer helpers

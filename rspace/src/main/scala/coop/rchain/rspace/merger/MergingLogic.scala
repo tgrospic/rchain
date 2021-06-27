@@ -30,9 +30,9 @@ object MergingLogic {
       */
     val racesForSameIOEvent = {
       val consumeRaces =
-        (a.consumesProduced intersect b.consumesProduced).toIterator.filterNot(_.persistent)
+        (a.consumesProduced intersect b.consumesProduced).iterator.filterNot(_.persistent)
       val produceRaces =
-        (a.producesConsumed intersect b.producesConsumed).toIterator.filterNot(_.persistent)
+        (a.producesConsumed intersect b.producesConsumed).iterator.filterNot(_.persistent)
 
       consumeRaces.flatMap(_.channelsHashes) ++ produceRaces.map(_.channelsHash)
     }
@@ -51,8 +51,8 @@ object MergingLogic {
       def check(left: EventLogIndex, right: EventLogIndex): Iterator[Blake2b256Hash] = {
         val p = producesCreatedAndNotDestroyed(left)
         val c = consumesCreatedAndNotDestroyed(right)
-        p.toIterator
-          .flatMap(p => c.toIterator.map((_, p)))
+        p.iterator
+          .flatMap(p => c.iterator.map((_, p)))
           .filter(tupled(matchFound))
           .map(_._2.channelsHash)
       }
@@ -63,7 +63,7 @@ object MergingLogic {
     // now we don't analyze joins and declare conflicting cases when produce touch join because applying
     // produces from both event logs might trigger continuation of some join, so COMM event
     val produceTouchBaseJoin =
-      (a.producesTouchingBaseJoins.toIterator ++ b.producesTouchingBaseJoins.toIterator)
+      (a.producesTouchingBaseJoins.iterator ++ b.producesTouchingBaseJoins.iterator)
         .map(_.channelsHash)
 
     racesForSameIOEvent ++ potentialCOMMs ++ produceTouchBaseJoin
@@ -114,9 +114,13 @@ object MergingLogic {
       .combinations(2)
       .filter {
         case List(l, r) => relation(l, r)
+        // TODO: [upgrade Scala 2.13] fix _match may not be exhaustive_
+        case _ => false
       }
       .foldLeft(init) {
         case (acc, List(l, r)) => acc.updated(l, acc(l) + r).updated(r, acc(r) + l)
+        // TODO: [upgrade Scala 2.13] fix _match may not be exhaustive_
+        case (acc, _) => acc
       }
   }
 

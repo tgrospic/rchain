@@ -4,7 +4,7 @@ import scala.collection.mutable
 
 import cats.Id
 
-import coop.rchain.catscontrib.effect.implicits._
+import coop.rchain.catscontrib.effect.instances._
 import coop.rchain.comm._
 
 import org.scalatest._

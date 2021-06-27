@@ -13,7 +13,7 @@ Global / dependencyOverrides := Dependencies.overrides
 
 lazy val projectSettings = Seq(
   organization := "coop.rchain",
-  scalaVersion := "2.12.11",
+  scalaVersion := "2.13.6",
   version := "0.1.0-SNAPSHOT",
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
@@ -53,7 +53,7 @@ lazy val projectSettings = Seq(
     Wart.AnyVal
   ),
   scalafmtOnCompile := !sys.env.contains("CI"), // disable in CI environments
-  scapegoatVersion in ThisBuild := "1.4.6",
+  scapegoatVersion in ThisBuild := "1.4.9",
   testOptions in Test += Tests.Argument("-oD"), //output test durations
   dependencyOverrides ++= Seq(
     "io.kamon" %% "kamon-core" % kamonVersion
@@ -187,7 +187,7 @@ lazy val comm = (project in file("comm"))
       scalapbRuntimegGrpc,
       scalaUri,
       weupnp,
-      hasher,
+//      hasher,
       catsCore,
       catsMtl,
       catsTagless,
@@ -394,9 +394,10 @@ lazy val rholang = (project in file("rholang"))
     scalacOptions ++= Seq(
       "-language:existentials",
       "-language:higherKinds",
-      "-Yno-adapted-args",
-      "-Xfatal-warnings",
-      "-Xlint:_,-missing-interpolator" // disable "possible missing interpolator" warning
+//      "-Yno-adapted-args",
+//      "-Xfatal-warnings",
+      "-Xlint:_,-missing-interpolator", // disable "possible missing interpolator" warning
+//      "-P:kind-projector:underscore-placeholders"
     ),
     publishArtifact in (Compile, packageDoc) := false,
     publishArtifact in packageDoc := false,

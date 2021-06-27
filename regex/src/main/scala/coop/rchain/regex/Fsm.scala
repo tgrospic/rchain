@@ -293,7 +293,7 @@ final case class Fsm(
     val checked   = mutable.Set(state)
     //can't use any functional iterator here (like reachable.exists), since queue is modified
     while (reachable.nonEmpty) {
-      val reachableState = reachable.dequeue
+      val reachableState = reachable.dequeue()
 
       if (finalStates.contains(reachableState)) {
         //we got the result, no more iterations needed, return immediately

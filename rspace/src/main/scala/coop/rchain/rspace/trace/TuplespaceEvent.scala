@@ -12,11 +12,11 @@ final case class TuplespaceOperation(
     eventHash: Blake2b256Hash
 )
 
-trait Polarity
+sealed trait Polarity
 case object Send    extends Polarity
 case object Receive extends Polarity
 
-trait Cardinality
+sealed trait Cardinality
 case object Linear    extends Cardinality
 case object NonLinear extends Cardinality
 case object Peek      extends Cardinality

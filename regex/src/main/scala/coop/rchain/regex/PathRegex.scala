@@ -251,7 +251,7 @@ object PathRegex {
     rxEscapeGroup.replaceAllIn(group, """\\$1""")
 
   private[this] val rxPath =
-    """(\\.)|(?:\:(\w+)(?:\(((?:\\.|[^\\()])+)\))?|\(((?:\\.|[^\\()])+)\))([+*?])?""".r
+    """(\\.)|(?:\:(\w+)(?:\(((?:\\.|[^\\()])+)\))?|\(((?:\\.|[^\\()])+)\))([+**])?""".r
 
   private[this] final case class ParseState(
       subStr: String,

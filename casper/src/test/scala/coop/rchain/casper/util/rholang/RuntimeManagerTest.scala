@@ -14,7 +14,7 @@ import coop.rchain.casper.util.rholang.SystemDeployPlayResult.{PlayFailed, PlayS
 import coop.rchain.casper.util.rholang.SystemDeployReplayResult.{ReplayFailed, ReplaySucceeded}
 import coop.rchain.casper.util.rholang.costacc._
 import coop.rchain.casper.util.{ConstructDeploy, GenesisBuilder}
-import coop.rchain.catscontrib.effect.implicits._
+import coop.rchain.catscontrib.effect.instances._
 import coop.rchain.crypto.codec.Base16
 import coop.rchain.crypto.hash.Blake2b512Random
 import coop.rchain.crypto.signatures.Signed

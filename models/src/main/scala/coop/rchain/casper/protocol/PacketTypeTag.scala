@@ -83,7 +83,8 @@ object PacketParseResult {
     override def fold[B](onSuccess: Nothing => B)(onFailure: String => B): B = onFailure(message)
   }
 
-  @inline def fromTry[A](a: Try[A]): PacketParseResult[A] = a.fold(Failure, Success(_))
+  @inline def fromTry[A](a: Try[A]): PacketParseResult[A] =
+    a.fold(Failure, Success(_): PacketParseResult[A])
 }
 
 import coop.rchain.casper.protocol.PacketParseResult._

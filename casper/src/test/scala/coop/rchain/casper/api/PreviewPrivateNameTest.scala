@@ -3,7 +3,7 @@ package coop.rchain.casper.api
 import cats.Id
 import coop.rchain.casper.util.ProtoUtil
 import coop.rchain.crypto.codec.Base16
-import coop.rchain.catscontrib.effect.implicits._
+import coop.rchain.catscontrib.effect.instances._
 import coop.rchain.p2p.EffectsTestInstances.LogStub
 import org.scalatest.{FlatSpec, Matchers}
 

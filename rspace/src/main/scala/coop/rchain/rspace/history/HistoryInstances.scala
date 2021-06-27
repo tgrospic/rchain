@@ -8,7 +8,7 @@ import coop.rchain.rspace.history.History._
 import scodec.bits.ByteVector
 
 import scala.Function.tupled
-import scala.Ordering.Implicits.seqDerivedOrdering
+import scala.Ordering.Implicits._
 import scala.collection.concurrent.TrieMap
 
 object HistoryInstances {
@@ -47,8 +47,10 @@ object HistoryInstances {
     ): (List[Trie], TriePointer) = {
       val affixBytes                                 = affix.toSeq.toList
       val prefixPath                                 = commonPrefix(incomingPath, affixBytes)
-      val incomingIdx :: incomingTail                = incomingPath.drop(prefixPath.size)
-      val existingIdx :: existingTail                = affixBytes.drop(prefixPath.size)
+      val incomingSeq                                = incomingPath.drop(prefixPath.size)
+      val (incomingIdx, incomingTail)                = (incomingSeq.head, incomingSeq.tail)
+      val affixSeq                                   = affixBytes.drop(prefixPath.size)
+      val (existingIdx, existingTail)                = (affixSeq.head, affixSeq.tail)
       val (newExistingPointer, maybeNewExistingSkip) = skip(existingTail, existingPointer)
       val (newIncomingPointer, maybeIncomingSkip)    = skip(incomingTail, incomingPointer)
       val pointerBlock = PointerBlock(
@@ -98,7 +100,7 @@ object HistoryInstances {
             existingPointer
           )
           val updatedPointerBlock = pointerBlock.updated((toInt(common.last), dividedTopPtr) :: Nil)
-          historyStore.drop(s :: pointerBlock :: Nil) >>
+          historyStore.drop((s: Trie) +: pointerBlock +: Nil) >>
             rehash(common.init, elems, updatedPointerBlock, dividedElems)
 
         case TriePath(elems :+ (pastPb: PointerBlock), None, common) => // add to existing node
@@ -134,8 +136,9 @@ object HistoryInstances {
                 val ptr     = pointer(other)
                 val updated = pointerBlock.updated((toInt(remainingPath.last), ptr) :: Nil)
                 historyStore.drop(pointerBlock :: Nil) >>
+                  // TODO: [upgrade Scala 2.13] fix append to list
                   Applicative[F].pure(
-                    (remainingPath.init, head, updated: Trie, currentAcc :+ nextLastSeen)
+                    (remainingPath.init, head, updated: Trie, currentAcc.appended(nextLastSeen))
                       .asLeft[List[Trie]]
                   )
 
@@ -147,13 +150,16 @@ object HistoryInstances {
                         remainingPath.dropRight(affix.size.toInt),
                         head,
                         Skip(affix, NodePointer(pb.hash)): Trie,
-                        currentAcc :+ nextLastSeen
+                        // TODO: [upgrade Scala 2.13] fix append to list
+                        currentAcc.appended(nextLastSeen)
                       )
                     )
                     .map(_.asLeft[List[Trie]])
 
-              case (Vector(), _) => Applicative[F].pure(currentAcc :+ nextLastSeen).map(_.asRight)
-              case _             => Sync[F].raiseError(MalformedTrieError)
+              case (Vector(), _) =>
+                // TODO: [upgrade Scala 2.13] fix append to list
+                Applicative[F].pure(currentAcc.appended(nextLastSeen)).map(_.asRight)
+              case _ => Sync[F].raiseError(MalformedTrieError)
 
             }
         }
@@ -216,6 +222,10 @@ object HistoryInstances {
 
           case (Nil, Vector(), None) =>
             Applicative[F].pure(EmptyTrie :: Nil).map(_.asRight) // collapse to empty trie
+
+          // TODO: [upgrade Scala 2.13] fix _match may not be exhaustive_
+          case (_, _, _) =>
+            Applicative[F].pure(EmptyTrie :: Nil).map(_.asRight) // collapse to empty trie
         }
       FlatMap[F].tailRecM((fullPath, trieNodesOnPath, none[Trie]))(go)
     }
@@ -226,7 +236,7 @@ object HistoryInstances {
         previousRoot: Trie
     ): F[Option[Blake2b256Hash]] = {
       def isDiverging(path: KeyPath, affix: ByteVector): Boolean =
-        (path.view, affix.toSeq.view).zipped.exists((l, r) => l != r)
+        path.view.lazyZip(affix.toSeq.view).exists((l, r) => l != r)
 
       def extractPointerToPointerBlock(ptr: ValuePointer): Option[Blake2b256Hash] =
         ptr match {
@@ -619,7 +629,8 @@ object HistoryInstances {
       def go(keys: List[Blake2b256Hash]): F[Either[List[Blake2b256Hash], Unit]] =
         if (keys.isEmpty) Sync[F].pure(().asRight)
         else {
-          val head :: rest = keys
+          // TODO: [upgrade Scala 2.13] fix _match may not be exhaustive_
+          val (head, rest) = keys.head -> keys.tail
           for {
             ts   <- Sync[F].delay { getValue(head) }
             _    <- historyStore.put(ts)

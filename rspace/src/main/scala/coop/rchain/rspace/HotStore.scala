@@ -227,6 +227,7 @@ private class InMemHotStore[F[_]: Concurrent, C, P, A, K](
               } else ().pure[F]
     } yield ()
 
+  @SuppressWarnings(Array("org.wartremover.warts.JavaSerializable"))
   def changes(): F[Seq[HotStoreAction]] =
     for {
       cache <- cacheRef.get
@@ -262,10 +263,10 @@ private class InMemHotStore[F[_]: Concurrent, C, P, A, K](
     for {
       cache         <- cacheRef.get
       data          = cache.data.readOnlySnapshot().map(_.leftMap(Seq(_))).toMap
-      continuations = (cache.continuations ++ cache.installedContinuations.mapValues(Seq(_))).toMap
+      continuations = (cache.continuations ++ cache.installedContinuations.view.mapValues(Seq(_))).toMap
       zipped        = zip(data, continuations, Seq.empty[Datum[A]], Seq.empty[WaitingContinuation[P, K]])
-      mapped        = zipped.mapValues { case (d, k) => Row(d, k) }
-    } yield mapped.filter { case (_, v) => !(v.data.isEmpty && v.wks.isEmpty) }
+      mapped        = zipped.view.mapValues { case (d, k) => Row(d, k) }
+    } yield mapped.filter { case (_, v) => !(v.data.isEmpty && v.wks.isEmpty) }.toMap
 }
 
 object HotStore {

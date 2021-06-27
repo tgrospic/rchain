@@ -8,7 +8,7 @@ import coop.rchain.p2p.effects._
 import cats.{catsInstancesForId => _, _}, cats.data._, cats.implicits._
 import cats.effect._
 import coop.rchain.catscontrib._, Catscontrib._, ski._
-import coop.rchain.catscontrib.effect.implicits._
+import coop.rchain.catscontrib.effect.instances._
 import coop.rchain.metrics.Metrics
 import coop.rchain.comm.rp.ProtocolHelper._
 import coop.rchain.p2p.EffectsTestInstances._

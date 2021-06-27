@@ -55,15 +55,21 @@ object ChannelStoreImpl {
     override def getChannelHash(hash: Blake2b256Hash): F[Option[ChannelHash]] = store.get(hash)
   }
 
+  val codecDataJoinHash: Codec[DataJoinHash] =
+    (codecPureBlake2b256Hash :: codecPureBlake2b256Hash).as[DataJoinHash]
+
+  val codecKontHash: Codec[ContinuationHash] =
+    codecPureBlake2b256Hash.as[ContinuationHash]
+
   def codecChannelHash: Codec[ChannelHash] =
     discriminated[ChannelHash]
       .by(uint2)
       .subcaseP(0) {
         case (dataJoinHash: DataJoinHash) => dataJoinHash
-      }(Codec[DataJoinHash])
+      }(codecDataJoinHash)
       .subcaseP(1) {
         case continuationHash: ContinuationHash => continuationHash
-      }(Codec[ContinuationHash])
+      }(codecKontHash)
 
   /**
     * No operation implementation of [[ChannelStore]]

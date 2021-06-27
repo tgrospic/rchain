@@ -17,7 +17,7 @@ class MetricsSemaphore[F[_]: Sync: Metrics](
   def acquireN(n: Long): F[Unit] =
     for {
       _ <- Metrics[F].incrementGauge("lock.queue")
-      _ <- Sync[F].defer(underlying.acquireN(n)).timer("lock.acquire")
+      _ <- Sync[F].defer(underlying.acquireN(n)) // .timer("lock.acquire")
       _ <- Metrics[F].decrementGauge("lock.queue")
     } yield ()
 

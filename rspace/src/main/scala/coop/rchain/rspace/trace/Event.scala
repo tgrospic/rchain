@@ -98,8 +98,8 @@ final case class Consume private (
 
 object Consume {
 
-  def unapply(arg: Consume): Option[(Seq[Blake2b256Hash], Blake2b256Hash, Int)] =
-    Some((arg.channelsHashes, arg.hash, 0))
+//  def unapply(arg: Consume): Option[(Seq[Blake2b256Hash], Blake2b256Hash, Int)] =
+//    Some((arg.channelsHashes, arg.hash, 0))
 
   def apply[C, P, K](
       channels: Seq[C],

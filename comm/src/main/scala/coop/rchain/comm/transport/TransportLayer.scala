@@ -7,9 +7,9 @@ import coop.rchain.comm.{CommError, PeerNode}
 
 final case class Blob(sender: PeerNode, packet: Packet)
 
-@autoFunctorK
-@autoSemigroupalK
-@autoProductNK
+//@autoFunctorK
+//@autoSemigroupalK
+//@autoProductNK
 trait TransportLayer[F[_]] {
   def send(peer: PeerNode, msg: Protocol): F[CommErr[Unit]]
   def broadcast(peers: Seq[PeerNode], msg: Protocol): F[Seq[CommErr[Unit]]]

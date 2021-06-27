@@ -4,7 +4,7 @@ import java.util
 
 import cats.{catsInstancesForId => _, _}
 
-import coop.rchain.catscontrib.effect.implicits._
+import coop.rchain.catscontrib.effect.instances._
 import coop.rchain.comm._
 import coop.rchain.crypto.codec.Base16
 

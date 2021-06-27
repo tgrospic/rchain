@@ -7,7 +7,6 @@ import java.security.cert._
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec._
 import java.util.Base64
-
 import coop.rchain.crypto.codec.Base16
 import coop.rchain.crypto.hash.Keccak256
 import org.bouncycastle.asn1.{
@@ -19,7 +18,8 @@ import org.bouncycastle.asn1.{
 }
 import org.bouncycastle.util.BigIntegers
 
-import scala.io.Source
+import java.nio.charset.Charset
+import scala.io.{Codec, Source}
 import scala.util.{Failure, Try}
 
 object CertificateHelper {
@@ -39,6 +39,7 @@ object CertificateHelper {
       case _ => false
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def publicAddress(publicKey: PublicKey): Option[Array[Byte]] =
     publicKey match {
       case p: ECPublicKey if isExpectedEllipticCurve(publicKey) =>
@@ -67,7 +68,7 @@ object CertificateHelper {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def readKeyPair(keyFile: File): KeyPair = {
     import coop.rchain.shared.Resources._
-    val str = withResource(Source.fromFile(keyFile)) {
+    val str = withResource(Source.fromFile(keyFile)(Codec(Charset.defaultCharset()))) {
       _.getLines().filter(!_.contains("KEY")).mkString
     }
     val spec     = new PKCS8EncodedKeySpec(Base64.getDecoder.decode(str))

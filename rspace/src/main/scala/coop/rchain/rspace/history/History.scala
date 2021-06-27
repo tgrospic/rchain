@@ -6,6 +6,8 @@ import coop.rchain.rspace.history.History._
 import coop.rchain.rspace.serializers.ScodecSerialize.{RichAttempt, _}
 import scodec.bits.{BitVector, ByteVector}
 
+import scala.collection.LazyZip2
+
 /**
   * History definition represents key-value API for RSpace tuple space
   *
@@ -53,7 +55,7 @@ object History {
     i.toByte
 
   def commonPrefix(l: KeyPath, r: KeyPath): KeyPath =
-    (l.view, r.view).zipped.takeWhile { case (ll, rr) => ll == rr }.map(_._1).toSeq
+    l.view.lazyZip(r.view).takeWhile { case (ll, rr) => ll == rr }.map(_._1).toSeq
 
   type KeyPath = Seq[Byte]
 }
@@ -123,7 +125,7 @@ object PointerBlock {
   def apply(first: (Int, TriePointer), second: (Int, TriePointer)): PointerBlock =
     PointerBlock.empty.updated(List(first, second))
 
-  def unapply(arg: PointerBlock): Option[Vector[TriePointer]] = Option(arg.toVector)
+//  def unapply(arg: PointerBlock): Option[Vector[TriePointer]] = Option(arg.toVector)
 }
 
 /*

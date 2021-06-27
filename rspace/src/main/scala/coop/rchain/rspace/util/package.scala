@@ -59,24 +59,27 @@ package object util {
   def runKs[T](t: Seq[Option[((T) => Unit, T)]]): Unit =
     t.foreach { case Some((k, data)) => k(data); case None => () }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Return"))
-  def veccmp(a: ByteVector, b: ByteVector): Int = {
-    val c = a.length - b.length
-    if (c != 0) {
-      c.toInt
-    } else {
-      for (i <- 0L until a.length) {
-        //indexed access of two ByteVectors can be not fast enough,
-        //however it is used by ByteVector creators (see === implementation)
-        val ai = a(i)
-        val bi = b(i)
-        if (ai != bi) {
-          return (ai & 0xFF) - (bi & 0xFF)
-        }
-      }
-      0
-    }
-  }
+  @SuppressWarnings(Array("org.wartremover.warts.Return", "org.wartremover.warts.Throw"))
+  def veccmp(a: ByteVector, b: ByteVector): Int =
+    Ordering[ByteVector].compare(a, b)
+//    val c = a.length - b.length
+//    if (c != 0) {
+//      c.toInt
+//    } else {
+//      for (i <- 0L until a.length) {
+//        //indexed access of two ByteVectors can be not fast enough,
+//        //however it is used by ByteVector creators (see === implementation)
+//        val ai = a(i)
+//        val bi = b(i)
+//        if (ai != bi) {
+//          val aa = (ai & 0xFF) - (bi & 0xFF)
+//          return aa
+//        } else {
+//          throw new Exception("")
+//        }
+//      }
+//      0
+//    }
 
   val ordByteVector: Ordering[ByteVector] = (a: ByteVector, b: ByteVector) => veccmp(a, b)
 

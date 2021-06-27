@@ -16,6 +16,8 @@ import scodec.{Attempt, Codec}
 import scala.collection.SortedSet
 import scala.collection.concurrent.TrieMap
 
+import Blake2b256Hash.codecPureBlake2b256Hash
+
 /**
   * This file represents RSpace serializers based on scodec library.
   *
@@ -157,10 +159,10 @@ object ScodecSerialize {
   implicit def codecLog: Codec[Seq[Event]] = codecSeq[Event](codecEvent)
 
   private val codecProduce: Codec[Produce] =
-    (Codec[Blake2b256Hash] :: Codec[Blake2b256Hash] :: bool).as[Produce]
+    (codecPureBlake2b256Hash :: codecPureBlake2b256Hash :: bool).as[Produce]
 
   private val codecConsume: Codec[Consume] =
-    (codecSeq[Blake2b256Hash] :: Codec[Blake2b256Hash] :: bool).as[Consume]
+    (codecSeq(codecPureBlake2b256Hash) :: codecPureBlake2b256Hash :: bool).as[Consume]
 
   private val codecCOMM: Codec[COMM] =
     (codecConsume :: codecSeq(codecProduce) :: sortedSet(uint8) :: codecMap(codecProduce, int32))

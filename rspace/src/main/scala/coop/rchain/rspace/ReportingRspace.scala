@@ -17,6 +17,7 @@ import coop.rchain.shared.SyncVarOps._
 import coop.rchain.shared.{Log, Serialize}
 import monix.execution.atomic.AtomicAny
 
+import java.util.concurrent.LinkedBlockingQueue
 import scala.collection.SortedSet
 import scala.concurrent.{ExecutionContext, SyncVar}
 
@@ -72,8 +73,9 @@ class ReportingRspace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, 
     * Seq(Seq[ReportingEvent](Precharge), Seq[ReportingEvent](userDeploy), Seq[ReportingEvent](Refund))
     * It would be seperated by the softcheckpoint creation.
     */
-  val report: SyncVar[Seq[Seq[ReportingEvent]]] = create[Seq[Seq[ReportingEvent]]](Seq.empty)
-  val softReport: SyncVar[Seq[ReportingEvent]]  = create[Seq[ReportingEvent]](Seq.empty)
+  val report: LinkedBlockingQueue[Seq[Seq[ReportingEvent]]] =
+    create[Seq[Seq[ReportingEvent]]](Seq.empty)
+  val softReport: LinkedBlockingQueue[Seq[ReportingEvent]] = create[Seq[ReportingEvent]](Seq.empty)
 
   private def collectReport =
     for {
@@ -87,10 +89,10 @@ class ReportingRspace[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, P, 
   def getReport: F[Seq[Seq[ReportingEvent]]] =
     for {
       _      <- collectReport
-      result = report.get
+      result = report.peek()
       _      = report.update(_ => Seq.empty[Seq[ReportingEvent]])
     } yield result
-  private def getSoftReport: F[Seq[ReportingEvent]] = Sync[F].delay(softReport.get)
+  private def getSoftReport: F[Seq[ReportingEvent]] = Sync[F].delay(softReport.peek())
 
   protected override def logComm(
       dataCandidates: Seq[ConsumeCandidate[C, A]],

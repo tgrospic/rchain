@@ -4,7 +4,7 @@ import cats._
 import cats.effect.Sync
 import cats.implicits._
 import cats.tagless._
-import coop.rchain.catscontrib.effect.implicits._
+import coop.rchain.catscontrib.effect.instances._
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox

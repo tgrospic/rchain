@@ -1,7 +1,6 @@
 package coop.rchain.comm.transport
 
 import java.io.ByteArrayInputStream
-
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.effect.{Concurrent, Sync}
@@ -22,6 +21,7 @@ import monix.eval.Task
 import monix.execution.Ack.Continue
 import monix.execution.{Cancelable, CancelableFuture, Scheduler}
 
+import java.nio.charset.Charset
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.util._
@@ -54,8 +54,8 @@ class GrpcTransportClient[F[_]: Monixable: Concurrent: Parallel: Log: Metrics](
   implicit val metricsSource: Metrics.Source =
     Metrics.Source(CommMetricsSource, "rp.transport")
 
-  private def certInputStream = new ByteArrayInputStream(cert.getBytes())
-  private def keyInputStream  = new ByteArrayInputStream(key.getBytes())
+  private def certInputStream = new ByteArrayInputStream(cert.getBytes(Charset.defaultCharset()))
+  private def keyInputStream  = new ByteArrayInputStream(key.getBytes(Charset.defaultCharset()))
 
   // Cache to store received partial data (streaming packets)
   private val cache = TrieMap[String, Array[Byte]]()

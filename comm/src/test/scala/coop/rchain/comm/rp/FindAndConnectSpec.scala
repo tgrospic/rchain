@@ -9,7 +9,7 @@ import org.scalatest._
 import org.scalatest.enablers.Containing
 import cats.{catsInstancesForId => _, _}, cats.data._, cats.implicits._
 import coop.rchain.catscontrib._, Catscontrib._, ski._
-import coop.rchain.catscontrib.effect.implicits._
+import coop.rchain.catscontrib.effect.instances._
 import coop.rchain.shared._
 import coop.rchain.comm.transport._
 import coop.rchain.comm.rp.ProtocolHelper._

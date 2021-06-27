@@ -28,7 +28,7 @@ final class SortedParMap private (ps: Map[Par, Par]) extends Iterable[(Par, Par)
 
   def contains(par: Par): Boolean = sortedMap.contains(sort(par))
 
-  def empty: SortedParMap = SortedParMap(Map.empty[Par, Par])
+  override def empty: SortedParMap = SortedParMap(Map.empty[Par, Par])
 
   def get(key: Par): Option[Par] = sortedMap.get(sort(key))
 

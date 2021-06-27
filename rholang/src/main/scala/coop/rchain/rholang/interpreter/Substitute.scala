@@ -33,14 +33,14 @@ object Substitute {
       .flatMap({ case (result, cost) => accounting.charge[M](cost).as(result) })
       .rethrow
 
-  def substituteAndCharge[A: Chargeable, M[_]: _cost: _error: Substitute[?[_], A]: Sync](
+  def substituteAndCharge[A: Chargeable, M[_]: _cost: _error: Substitute[*[_], A]: Sync](
       term: A,
       depth: Int,
       env: Env[Par]
   ): M[A] =
     charge(Substitute[M, A].substitute(term)(depth, env), Cost(term))
 
-  def substituteNoSortAndCharge[A: Chargeable, M[_]: _cost: _error: Substitute[?[_], A]: Sync](
+  def substituteNoSortAndCharge[A: Chargeable, M[_]: _cost: _error: Substitute[*[_], A]: Sync](
       term: A,
       depth: Int,
       env: Env[Par]
@@ -59,7 +59,7 @@ object Substitute {
 
   def apply[M[_], A](implicit ev: Substitute[M, A]): Substitute[M, A] = ev
 
-  def maybeSubstitute[M[+_]: Sync](
+  def maybeSubstitute[M[_]: Sync](
       term: Var
   )(implicit depth: Int, env: Env[Par]): M[Either[Var, Par]] =
     if (depth != 0) term.asLeft[Par].pure[M]

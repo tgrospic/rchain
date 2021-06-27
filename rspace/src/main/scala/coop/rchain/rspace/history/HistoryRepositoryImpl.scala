@@ -62,7 +62,7 @@ final case class HistoryRepositoryImpl[F[_]: Concurrent: Parallel: Log: Span, C,
     )
 
   private def computeMeasure(actions: List[HotStoreAction]): List[String] =
-    actions.par.map {
+    actions.map {
       case i: InsertData[C, A] =>
         val key  = hashDataChannel(i.channel, serializeC).bytes
         val data = encodeDatums(i.data)(serializeA)
@@ -185,7 +185,7 @@ final case class HistoryRepositoryImpl[F[_]: Concurrent: Parallel: Log: Span, C,
   // this method is what chackpoint is supposed to do, but checkoint operates on actions on channels, and this
   // address by hashes. TODO elaborate unified API
   def doCheckpoint(trieActions: Seq[HotStoreTrieAction]): F[HistoryRepository[F, C, P, A, K]] = {
-    val storageActions = trieActions.par.map(calculateStorageActions)
+    val storageActions = trieActions.map(calculateStorageActions)
     val coldActions    = storageActions.map(_._1).collect { case (key, Some(data)) => (key, data) }
     val historyActions = storageActions.map(_._2)
 
@@ -220,7 +220,7 @@ final case class HistoryRepositoryImpl[F[_]: Concurrent: Parallel: Log: Span, C,
   }
 
   override def checkpoint(actions: List[HotStoreAction]): F[HistoryRepository[F, C, P, A, K]] = {
-    val trieActions = actions.par.map(transform).toList
+    val trieActions = actions.map(transform).toList
     // store channels mapping
     val storeChannels = Stream
       .emits(actions.map(a => Stream.eval(storeChannelHash(a).map(_.asLeft[History[F]]))))

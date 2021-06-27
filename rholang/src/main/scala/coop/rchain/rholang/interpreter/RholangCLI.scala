@@ -76,7 +76,7 @@ object RholangCLI {
     } yield (runtime)).unsafeRunSync
 
     val problems = try {
-      if (conf.files.supplied) {
+      if (conf.files.isSupplied) {
         val problems = for {
           f <- conf.files()
           result = processFile(

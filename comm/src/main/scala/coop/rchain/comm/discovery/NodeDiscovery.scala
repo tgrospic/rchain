@@ -4,9 +4,9 @@ import cats.tagless._
 import cats.Monad
 import coop.rchain.comm.{NodeIdentifier, PeerNode}
 
-@autoFunctorK
-@autoSemigroupalK
-@autoProductNK
+//@autoFunctorK
+//@autoSemigroupalK
+//@autoProductNK
 trait NodeDiscovery[F[_]] {
   def discover: F[Unit]
   def peers: F[Seq[PeerNode]]

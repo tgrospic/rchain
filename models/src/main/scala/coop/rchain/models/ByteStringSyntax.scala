@@ -9,7 +9,7 @@ trait ByteStringSyntax {
     new ByteStringOps(bs)
 
   implicit def ordering: Ordering[ByteString] =
-    Ordering.by((b: ByteString) => b.toByteArray.toIterable)
+    Ordering.by[ByteString, Iterable[Byte]](b => b.toByteArray.toIterable)
 
   implicit val show = new Show[ByteString] {
     def show(validator: ByteString): String = validator.base16String

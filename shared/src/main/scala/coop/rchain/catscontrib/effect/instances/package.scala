@@ -7,7 +7,7 @@ import cats.effect._
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
-package object implicits {
+package object instances {
 
   // this is for testing purposes, do not use in production code!
   implicit val concurrentId: Concurrent[Id] =

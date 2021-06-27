@@ -13,9 +13,10 @@ import coop.rchain.rspace.history._
 import coop.rchain.rspace.internal._
 import coop.rchain.rspace.trace.{COMM, Consume, Produce, Log => EventLog}
 import coop.rchain.shared.SyncVarOps._
-import coop.rchain.shared.{Log, Serialize}
+import coop.rchain.shared.{Log, Serialize, SyncVarOps}
 import monix.execution.atomic.AtomicAny
 
+import java.util.concurrent.LinkedBlockingQueue
 import scala.collection.SortedSet
 import scala.concurrent.{ExecutionContext, SyncVar}
 import scala.util.Random
@@ -54,13 +55,13 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
   def assertF(predicate: Boolean, errorMsg: => String): F[Unit] =
     Sync[F].raiseError(new IllegalStateException(errorMsg)).unlessA(predicate)
 
-  protected[this] val eventLog: SyncVar[EventLog] = create[EventLog](Seq.empty)
-  protected[this] val produceCounter: SyncVar[Map[Produce, Int]] =
+  protected[this] val eventLog: LinkedBlockingQueue[EventLog] = create[EventLog](Seq.empty)
+  protected[this] val produceCounter: LinkedBlockingQueue[Map[Produce, Int]] =
     create[Map[Produce, Int]](Map.empty.withDefaultValue(0))
 
   protected[this] def produceCounters(produceRefs: Seq[Produce]): Map[Produce, Int] =
     produceRefs
-      .map(p => p -> produceCounter.get(p))
+      .map(p => p -> produceCounter.peek()(p))
       .toMap
 
   private val lockF = new ConcurrentTwoStepLockF[F, Blake2b256Hash](MetricsSource)
@@ -85,10 +86,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
 
   protected[this] val logger: Logger
 
-  private[this] val installs: SyncVar[Installs[F, C, P, A, K]] = {
-    val installs = new SyncVar[Installs[F, C, P, A, K]]()
-    installs.put(Map.empty)
-    installs
+  private[this] val installs: LinkedBlockingQueue[Installs[F, C, P, A, K]] = {
+    SyncVarOps.create(Map.empty)
   }
 
   def store: HotStore[F, C, P, A, K]
@@ -171,7 +170,9 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
 
   def restoreInstalls(): F[Unit] =
     /*spanF.trace(restoreInstallsSpanLabel)*/
-    installs.get.toList
+    installs
+      .peek()
+      .toList
       .traverse {
         case (channels, Install(patterns, continuation)) =>
           install(channels, patterns, continuation)
@@ -414,9 +415,7 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
         acc: Seq[CandidateChannels]
     ): F[Either[Seq[CandidateChannels], MaybeProduceCandidate]] =
       acc match {
-        case Nil =>
-          none[ProduceCandidate[C, P, A, K]].asRight[Seq[CandidateChannels]].pure[F]
-        case channels :: remaining =>
+        case channels +: remaining =>
           for {
             matchCandidates <- fetchMatchingContinuations(channels)
             channelToIndexedDataList <- channels.traverse { c: C =>
@@ -431,6 +430,8 @@ abstract class RSpaceOps[F[_]: Concurrent: ContextShift: Log: Metrics: Span, C, 
             case None             => remaining.asLeft[MaybeProduceCandidate]
             case produceCandidate => produceCandidate.asRight[Seq[CandidateChannels]]
           }
+        case _ =>
+          none[ProduceCandidate[C, P, A, K]].asRight[Seq[CandidateChannels]].pure[F]
       }
     groupedChannels.tailRecM(go)
   }

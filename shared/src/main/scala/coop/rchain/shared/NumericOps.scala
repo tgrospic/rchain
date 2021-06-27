@@ -3,6 +3,8 @@ package coop.rchain.shared
 object NumericOps {
   def by[B, A](f: B => A, g: A => B)(implicit ev: Numeric[A]): Numeric[B] =
     new Numeric[B] {
+      override def parseString(str: String): Option[B] = Some(fromInt(0))
+
       override def plus(x: B, y: B): B =
         g(ev.plus(f(x), f(y)))
 

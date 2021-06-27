@@ -724,7 +724,7 @@ void VirtualMachine::execute() {
     pOb result = INVALID;
 
     if (VerboseFlag) fprintf(stderr, "\n%s\n", __PRETTY_FUNCTION__);
-    
+
     collectExportCode(code);
 
 nextop:
@@ -1222,7 +1222,7 @@ nextop:
 
     case opXferLexToArg | IndirectOff | 0:
         /*
-         * This is a minor win for the incredibly common lex[0,?] case.
+         * This is a minor win for the incredibly common lex[0,*] case.
          */
         ASSIGN(ctxt->argvec, elem(OP_f7_op0(instr)),
                ctxt->env->slot(OP_f7_offset(instr)));

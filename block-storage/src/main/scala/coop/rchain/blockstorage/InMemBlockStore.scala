@@ -66,7 +66,7 @@ object InMemBlockStore {
     new InMemBlockStore[F](refF, approvedBlockRef)
 
   def createWithId: BlockStore[Id] = {
-    import coop.rchain.catscontrib.effect.implicits._
+    import coop.rchain.catscontrib.effect.instances._
     import coop.rchain.metrics.Metrics.MetricsNOP
     val refId                = emptyMapRef[Id](syncId)
     val approvedBlockRef     = Ref[Id].of(none[ApprovedBlock])

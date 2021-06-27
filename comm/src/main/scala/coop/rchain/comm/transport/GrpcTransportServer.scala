@@ -3,7 +3,6 @@ package coop.rchain.comm.transport
 import java.io.ByteArrayInputStream
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
-
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.all._
@@ -20,6 +19,7 @@ import io.grpc.netty.GrpcSslContexts
 import io.netty.handler.ssl._
 import monix.execution.{Cancelable, Scheduler}
 
+import java.nio.charset.Charset
 import scala.collection.concurrent.TrieMap
 import scala.io.Source
 import scala.util.{Left, Right}
@@ -41,8 +41,8 @@ class GrpcTransportServer[F[_]: Monixable: Concurrent: RPConfAsk: Log: Metrics](
     parallelism: Int
 )(implicit mainScheduler: Scheduler)
     extends TransportLayerServer[F] {
-  private def certInputStream = new ByteArrayInputStream(cert.getBytes())
-  private def keyInputStream  = new ByteArrayInputStream(key.getBytes())
+  private def certInputStream = new ByteArrayInputStream(cert.getBytes(Charset.defaultCharset()))
+  private def keyInputStream  = new ByteArrayInputStream(key.getBytes(Charset.defaultCharset()))
 
   implicit val metricsSource: Metrics.Source =
     Metrics.Source(CommMetricsSource, "rp.transport")
@@ -112,8 +112,10 @@ object GrpcTransportServer {
       maxStreamMessageSize: Long,
       parallelism: Int
   )(implicit mainScheduler: Scheduler): TransportServer[F] = {
-    val cert = Resources.withResource(Source.fromFile(certPath.toFile))(_.mkString)
-    val key  = Resources.withResource(Source.fromFile(keyPath.toFile))(_.mkString)
+    val cert =
+      Resources.withResource(Source.fromFile(certPath.toFile)(Charset.defaultCharset()))(_.mkString)
+    val key =
+      Resources.withResource(Source.fromFile(keyPath.toFile)(Charset.defaultCharset()))(_.mkString)
     new TransportServer[F](
       new GrpcTransportServer[F](
         networkId,

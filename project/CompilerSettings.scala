@@ -17,16 +17,18 @@ object CompilerSettings {
   private lazy val commonOptions =
     // format: off
     Seq(
-      "-Xfuture",
-      "-Ypartial-unification",
+//      "-Xfuture",
+//      "-Ypartial-unification",
       "-Ywarn-dead-code",
       "-Ywarn-numeric-widen",
       "-deprecation",
       "-encoding", "UTF-8",
-      "-feature",
+//      "-feature",
       "-language:_",
       "-unchecked",
-      "-Xfatal-warnings",
+      "-Ypatmat-exhaust-depth", "off", // Exhaustivity analysis reached max recursion depth, not all missing cases are reported.
+      "-Xlint:strict-unsealed-patmat", "off",
+//      "-Xfatal-warnings",
       //With > 16: [error] invalid setting for -Ybackend-parallelism must be between 1 and 16
       //https://github.com/scala/scala/blob/v2.12.6/src/compiler/scala/tools/nsc/settings/ScalaSettings.scala#L240
       "-Ybackend-parallelism", getRuntime.availableProcessors().min(16).toString
@@ -49,6 +51,19 @@ object CompilerSettings {
             "-Ywarn-unused:patvars",
             "-Ywarn-unused:privates"
           )
+        case Some((2, major)) if major >= 13 =>
+          // We disable warnings about unused imports for Scala 2.12+
+          // because certain imports (ex: cat.syntax.either) provide
+          // compatibility for Scala versions < 2.12
+          Seq(
+            "-Xlint:-unused,-adapted-args,-inaccessible,_",
+            "-Ywarn-unused:implicits",
+            "-Ywarn-macros:after",
+            "-Ywarn-unused:locals",
+            "-Ywarn-unused:patvars",
+            "-Ywarn-unused:privates",
+            "-Ymacro-annotations"
+          )
         case _ =>
           Seq(
             "-Xlint:-missing-interpolator,-adapted-args,-inaccessible,_",
@@ -60,7 +75,7 @@ object CompilerSettings {
     scalacOptions in (Compile, console) ~= {
       _.filterNot(
         Set(
-          "-Xfatal-warnings",
+//          "-Xfatal-warnings",
           "-Ywarn-unused-import",
           "-Ywarn-unused:imports"
         )

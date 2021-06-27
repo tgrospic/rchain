@@ -3,11 +3,12 @@ package coop.rchain.comm.transport
 import java.net.Socket
 import java.security.KeyStore
 import java.security.cert.{CertificateException, X509Certificate}
-
 import coop.rchain.crypto.codec.Base16
 import coop.rchain.crypto.util.CertificateHelper
 import io.netty.handler.ssl.util.SimpleTrustManagerFactory
 import io.netty.util.internal.EmptyArrays
+
+import java.util.Locale
 import javax.net.ssl._
 
 class HostnameTrustManagerFactory private () extends SimpleTrustManagerFactory {
@@ -104,7 +105,7 @@ private class HostnameTrustManager extends X509ExtendedTrustManager {
       algorithm: String
   ): Unit = {
     import sun.security.util.HostnameChecker
-    algorithm.toLowerCase match {
+    algorithm.toLowerCase(Locale.US) match {
       case "https" =>
         val host = hostname
           .filter(_.startsWith("["))
