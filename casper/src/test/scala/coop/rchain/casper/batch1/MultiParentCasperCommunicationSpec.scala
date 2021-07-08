@@ -5,6 +5,7 @@ import coop.rchain.casper.helper.TestNode
 import coop.rchain.casper.helper.TestNode._
 import coop.rchain.casper.protocol._
 import coop.rchain.casper.util.ConstructDeploy
+import coop.rchain.crypto.PrivateKey
 import coop.rchain.crypto.signatures.Signed
 import coop.rchain.p2p.EffectsTestInstances.LogicalTime
 import coop.rchain.shared.scalatestcontrib._
@@ -156,6 +157,57 @@ class MultiParentCasperCommunicationSpec extends FlatSpec with Matchers with Ins
           // Oh yes - 10!
         } yield result
       }
+  }
+
+  val deploy1: Effect[Signed[DeployData]] = ConstructDeploy.sourceDeployNowF("Nil")
+  val deploy2: Effect[Signed[DeployData]] = ConstructDeploy.sourceDeployNowF("Nil | Nil")
+  val deploy3: Effect[Signed[DeployData]] =
+    ConstructDeploy.sourceDeployNowF("Nil | Nil | Nil", sec = ConstructDeploy.defaultSec2)
+
+  "the same deployer in parent blocks" should "fail because of conflict" in effectTest {
+    TestNode.networkEff(genesis, networkSize = 2).use { nodes =>
+      for {
+        _ <- deploy1 >>= (nodes(0).addBlock(_))
+        _ <- deploy2 >>= (nodes(1).addBlock(_))
+
+        // Node receives parent blocks with the same deployer (conflict)
+        // - error: Unable to consume results of system deploy
+        _ <- nodes(0).syncWith(nodes(1))
+
+        _ <- deploy1 >>= (nodes(0).addBlock(_))
+
+      } yield ()
+    }
+  }
+
+  "the same deployer in parent blocks with max parents 1" should "execute successfully" in effectTest {
+    TestNode.networkEff(genesis, networkSize = 2, maxNumberOfParents = 1).use { nodes =>
+      for {
+        _ <- deploy1 >>= (nodes(0).addBlock(_))
+        _ <- deploy2 >>= (nodes(1).addBlock(_))
+
+        // Node receives parent blocks with the same deployer (conflict but parents are not merged)
+        _ <- nodes(0).syncWith(nodes(1))
+
+        _ <- deploy1 >>= (nodes(0).addBlock(_))
+
+      } yield ()
+    }
+  }
+
+  "different deployer in parent blocks" should "execute successfully" in effectTest {
+    TestNode.networkEff(genesis, networkSize = 2).use { nodes =>
+      for {
+        _ <- deploy1 >>= (nodes(0).addBlock(_))
+        _ <- deploy3 >>= (nodes(1).addBlock(_))
+
+        // Node receives parent blocks with different deployers (no conflict)
+        _ <- nodes(0).syncWith(nodes(1))
+
+        _ <- deploy1 >>= (nodes(0).addBlock(_))
+
+      } yield ()
+    }
   }
 
 }
